@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__claude_ai_Figma__get_design_context",
+      "Bash(python3)",
+      "Bash(jq -r '.[0].text' /Users/karan/.claude/projects/-Users-karan-PowerUpBots/c4dd7d6d-708d-4b68-af36-550692be29ea/tool-results/mcp-claude_ai_Figma-get_design_context-1778131507771.txt)",
+      "Read(//tmp/**)",
+      "Bash(head -100 /tmp/first_text.txt)",
+      "Read(//private/tmp/**)",
+      "Bash(grep -o 'http[s]*://[^\"]*' /tmp/first_text.txt | head -20)",
+      "Bash(grep -i 'screenshot\\\\|url\\\\|asset\\\\|image\\\\|href' /tmp/first_text.txt | head -20)",
+      "Read(//Users/karan/StorylineSample/story/**)",
+      "Bash(wc -l /Users/karan/StorylineSample/story/ebook.html)",
+      "Bash(open /Users/karan/PowerUpBots/story/main.html)",
+      "Bash(osascript)",
+      "Bash(awk -F'\"' '{print NR\". id=\"$2\" x=\"$8}')",
+      "Bash(sort -t'\"' -k2 -n)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[:3000]\\)\")",
+      "Read(//Users/karan/Library/Application Support/Claude/**)",
+      "Bash(ls ~/Desktop/*.png ~/Desktop/*.jpg ~/Downloads/*.png ~/Downloads/*.jpg 2>/dev/null | head -20)",
+      "Read(//Users/karan/Desktop/**)",
+      "Bash(find ~/Desktop ~/Downloads -maxdepth 2 -newer /Users/karan/PowerUpBots/story/main.html -name \"*.png\" -o -name \"*.jpg\" 2>/dev/null | head -10)",
+      "Bash(find ~/Desktop ~/Downloads -maxdepth 2 -name \"*.png\" -newer /Users/karan/PowerUpBots/story/main.html 2>/dev/null | head -5)",
+      "Read(//Users/karan/Downloads/**)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(f'Array length: {len\\(data\\)}'\\); [print\\(f'Item {i}: type={item[\\\\\"type\\\\\"]}, text_len={len\\(item[\\\\\"text\\\\\"]\\)}'\\) for i,item in enumerate\\(data\\)]\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[1]['text']\\)\")",
+      "Bash(python3 -c ' *)"
+    ],
+    "additionalDirectories": [
+      "/Users/karan/StorylineSample/story"
+    ]
+  }
+}
