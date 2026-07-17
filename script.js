@@ -57,8 +57,14 @@ const pages = [
   { type: "video", src: "assets/1.mp4" },   // 1 — opening video
   { type: "video", src: "assets/2.mp4" },   // 2
   { type: "video", src: "assets/3.mp4" },   // 3
-  { type: "video", src: "assets/4.mp4" },   // 4
-  { type: "end" },                          // 5 — THE END page (cream) + Replay
+  // 4 — the embedded LBD game (Stairway Shuffle). Flipping here launches the game
+  // FULL SCREEN (a body-level overlay, NOT inside the flipbook); once the game
+  // reports it is complete the book auto-turns to the next page. `poster` is the
+  // game's start screen — shown on the leaf while you flip in, and as the loading
+  // backdrop inside the overlay. (Folder name "LBD 1" is URL-encoded as LBD%201.)
+  { type: "lbd", src: "LBD%201/story/index.html", poster: "LBD%201/story/assets/GameStartScreen.webp" },
+  { type: "video", src: "assets/4.mp4" },   // 5
+  { type: "end" },                          // 6 — THE END page (cream) + Replay
 ];
 
 /* ============================================================================
@@ -282,6 +288,7 @@ const homeBtn     = document.getElementById("homeBtn");
    ========================================================================== */
 const lbdStage = document.getElementById("lbdStage");
 const lbdFrame = document.getElementById("lbdFrame");
+const lbdSkip  = document.getElementById("lbdSkip");   // "Skip ›" — leave the game early
 let lbdFullscreen = false;   // is the overlay expanded to full screen right now?
 let lbdStarted    = false;   // has the child tapped Start at least once this visit?
 let lbdWasOn      = false;   // was the overlay showing on the previous refresh?
@@ -319,6 +326,9 @@ let lbdAnimTimer = null;
 function setLbdFullscreen(on) {
   if (!lbdStage) return;
   lbdFullscreen = on;
+  // The game has its OWN music (its theme track), so silence the flipbook's
+  // background music while the game is up, then bring it back on the way out.
+  try { if (on) { bgMusic.pause(); } } catch (_) {}
   positionLbdStage();                        // make the inline page-rect geometry current
   lbdStage.classList.add("lbd-anim");        // turn the box-morph transition ON for this toggle
   void lbdStage.offsetWidth;                 // commit, so the class change below animates from here
@@ -340,6 +350,11 @@ function updateLbdOverlay() {
     lbdStage.classList.add("visible");
     lbdStage.setAttribute("aria-hidden", "false");
     lbdWasOn = true;
+    // The game plays FULL SCREEN, not inside the flipbook: the instant we land on
+    // the game page, grow the overlay out of the page rectangle to fill the whole
+    // viewport. Done ONCE per visit (the guard skips the idempotent re-assert call
+    // that refreshMedia fires after the flip settles, and skips it while exiting).
+    if (!lbdFullscreen && !lbdExiting) setLbdFullscreen(true);
   } else if (!lbdFullscreen) {           // never hide mid-game (we can't leave while fullscreen)
     lbdStage.classList.remove("visible");
     lbdStage.setAttribute("aria-hidden", "true");
@@ -349,23 +364,46 @@ function updateLbdOverlay() {
     }
   }
 }
-// Game finished (or the temporary Skip was tapped): come back into the page, then
-// automatically turn to the next page.
+// Game finished (or Skip was tapped): shrink the game back out of full screen and
+// then automatically turn to the next story page.
 function exitLbd() {
   if (lbdExiting) return;
   lbdExiting = true;
   setLbdFullscreen(false);                // shrink the game back into the page
   setTimeout(function () {
     lbdExiting = false;
+    playBgMusic();                        // bring the flipbook's background music back
     if (flipped === LBD_INDEX) goNext();  // auto-advance to the next story page
   }, 470);                                // just after the shrink transition (.4s)
 }
-// Listen for the game's messages (start → fullscreen, complete → advance).
+// How long to let the game's own win celebration ("Bots Powered Up!") play before
+// we shrink out and turn the page.
+const LBD_CELEBRATE_MS = 3800;
+let _lbdCompleteTimer = null;
+// Listen for the game's messages. The game posts { type: "activity_complete" } when
+// the child finishes; older builds posted { source:"lbd", type:"lbd-complete" }.
+// Either one ends the game → (after a short celebration) advance to the next page.
 window.addEventListener("message", function (e) {
   const d = e && e.data;
-  if (!d || d.source !== "lbd") return;
-  if (d.type === "lbd-start") { lbdStarted = true; setLbdFullscreen(true); }
-  else if (d.type === "lbd-complete") { exitLbd(); }
+  if (!d) return;
+  const isComplete = d.type === "activity_complete" ||
+                     (d.source === "lbd" && d.type === "lbd-complete");
+  if (d.source === "lbd" && d.type === "lbd-start") {   // (kept for compatibility)
+    lbdStarted = true; setLbdFullscreen(true);
+  } else if (isComplete) {
+    if (lbdExiting || _lbdCompleteTimer) return;        // only advance once
+    _lbdCompleteTimer = setTimeout(function () {
+      _lbdCompleteTimer = null;
+      exitLbd();
+    }, LBD_CELEBRATE_MS);
+  }
+});
+// "Skip ›" — bail out of the game and go straight to the next page.
+if (lbdSkip) lbdSkip.addEventListener("click", function (e) {
+  e.stopPropagation();
+  clearTimeout(_lbdCompleteTimer); _lbdCompleteTimer = null;
+  exitLbd();
+  this.blur();
 });
 
 let opened = false;      // has the cover been opened?
@@ -874,8 +912,9 @@ window.addEventListener("orientationchange", onViewportChange);
 
 /* ==========================================================================
    SOUND  —  real audio files in sfx/: Page flip.mp3 (every page flip),
-   cover page flip.mp3 (the cover opening), and BG Music.mp3 (looping background
-   music at 40% volume). All muted until the book is opened (a user gesture).
+   cover page flip.mp3 (the cover opening), and game-bgm.ogg (the LBD game's theme,
+   looping background music at 20% volume). All muted until the book is opened
+   (a user gesture).
    ========================================================================== */
 let muted = true;
 
@@ -910,9 +949,11 @@ window.addEventListener("keydown",     _titleGesture, true);
 window.addEventListener("touchstart",  _titleGesture, true);
 playTitleVo();   // try to autoplay the moment the flipbook loads
 
-// Looping BACKGROUND MUSIC at 40% volume. Started on open (a user gesture) so
-// the browser allows it to play with sound.
-const bgMusic = new Audio("sfx/BG%20Music.mp3");
+// Looping BACKGROUND MUSIC — the GAME's theme track (sfx/game-bgm.ogg, copied from
+// the LBD game's audios/ThemeMusic.ogg) at 20% volume. Started on open (a user
+// gesture) so the browser allows it to play with sound. It is paused while the
+// embedded game is on screen (the game plays its own music) — see setLbdFullscreen.
+const bgMusic = new Audio("sfx/game-bgm.ogg");
 bgMusic.loop = true;
 bgMusic.volume = 0.20;                      // 20% volume, per request
 bgMusic.preload = "auto";

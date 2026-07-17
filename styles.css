@@ -889,9 +889,31 @@
     position: absolute; inset: 0; width: 100%; height: 100%;
     border: 0; display: block; background: #0a0f2d;
   }
-  /* While the game is full screen, get the book chrome out of the way. */
+  /* While the game is full screen, get ALL the book chrome out of the way so the
+     game owns the whole screen (arrows, toolbar, Home button, page-turn hint). */
   body.lbd-fullscreen .corner-arrow,
-  body.lbd-fullscreen .toolbar { display: none !important; }
+  body.lbd-fullscreen .toolbar,
+  body.lbd-fullscreen .home-btn,
+  body.lbd-fullscreen .flip-hint { display: none !important; }
+
+  /* "Skip ›" — a small, unobtrusive escape hatch, shown only while the game is
+     full screen. Tapping it leaves the game and turns to the next page (same as
+     the game finishing). Sits top-right, clear of the game's own top-left UI. */
+  .lbd-skip {
+    position: absolute; top: 14px; right: 16px; z-index: 5;
+    display: none;                       /* only shown in fullscreen (rule below) */
+    padding: 7px 14px; border: 0; border-radius: 999px; cursor: pointer;
+    font-family: "Fredoka", system-ui, sans-serif; font-weight: 600;
+    font-size: 15px; line-height: 1; color: #eafffb;
+    background: rgba(10, 15, 45, 0.55);
+    border: 1.5px solid rgba(47, 230, 214, 0.7);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    opacity: 0.85; transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .lbd-stage.fullscreen .lbd-skip { display: inline-block; }
+  .lbd-skip:hover { opacity: 1; transform: scale(1.05); }
+  .lbd-skip:active { transform: scale(0.97); }
 
   /* ---- Speech bubble (SVG) --------------------------------------------------
      A white comic bubble with a black outline + purple neon glow and a tail,
