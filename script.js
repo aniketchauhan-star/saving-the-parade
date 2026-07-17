@@ -288,7 +288,6 @@ const homeBtn     = document.getElementById("homeBtn");
    ========================================================================== */
 const lbdStage = document.getElementById("lbdStage");
 const lbdFrame = document.getElementById("lbdFrame");
-const lbdSkip  = document.getElementById("lbdSkip");   // "Skip ›" — leave the game early
 let lbdFullscreen = false;   // is the overlay expanded to full screen right now?
 let lbdStarted    = false;   // has the child tapped Start at least once this visit?
 let lbdWasOn      = false;   // was the overlay showing on the previous refresh?
@@ -364,8 +363,8 @@ function updateLbdOverlay() {
     }
   }
 }
-// Game finished (or Skip was tapped): shrink the game back out of full screen and
-// then automatically turn to the next story page.
+// Game finished: shrink the game back out of full screen and then automatically
+// turn to the next story page.
 function exitLbd() {
   if (lbdExiting) return;
   lbdExiting = true;
@@ -397,13 +396,6 @@ window.addEventListener("message", function (e) {
       exitLbd();
     }, LBD_CELEBRATE_MS);
   }
-});
-// "Skip ›" — bail out of the game and go straight to the next page.
-if (lbdSkip) lbdSkip.addEventListener("click", function (e) {
-  e.stopPropagation();
-  clearTimeout(_lbdCompleteTimer); _lbdCompleteTimer = null;
-  exitLbd();
-  this.blur();
 });
 
 let opened = false;      // has the cover been opened?
