@@ -178,14 +178,14 @@
 <button class="arrow prev" id="prev" aria-label="Previous page">‹</button>
 <button class="arrow next" id="next" aria-label="Next page">›</button>
 
-<!-- ── Embedded LBD game (Stairway Shuffle) ──
+<!-- ── Embedded LBD game (PowerUp Bots) ──
      A body-level overlay (NOT inside the 3D book) so it can expand to a true
      full-screen box — a CSS transform on the book would otherwise trap
      position:fixed. The engine (script.js) reveals it when you land on the game
      page, grows it to fullscreen, and turns to the next page once the game
      reports it is complete. -->
 <div class="lbd-stage" id="lbdStage" aria-hidden="true">
-  <iframe id="lbdFrame" title="Stairway Shuffle game" allow="autoplay; fullscreen" allowfullscreen></iframe>
+  <iframe id="lbdFrame" title="PowerUp Bots game" allow="autoplay; fullscreen" allowfullscreen></iframe>
   <!-- "Next" button — hidden while the game is played; revealed ONLY once the game
        reports it is complete. Tapping it shrinks the game away and turns back to
        the flipbook (the next story page). -->

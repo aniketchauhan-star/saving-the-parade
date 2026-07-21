@@ -57,7 +57,7 @@ const pages = [
   { type: "video", src: "assets/1.mp4" },   // 1 — opening video
   { type: "video", src: "assets/2.mp4" },   // 2
   { type: "video", src: "assets/3.mp4" },   // 3
-  // 4 — the embedded LBD game (Stairway Shuffle). Flipping here launches the game
+  // 4 — the embedded LBD game (PowerUp Bots). Flipping here launches the game
   // FULL SCREEN (a body-level overlay, NOT inside the flipbook); once the game
   // reports it is complete the book auto-turns to the next page. `poster` is the
   // game's start screen — shown on the leaf while you flip in, and as the loading
@@ -84,7 +84,7 @@ function makeMedia(page) {
     img.addEventListener("dragstart", function (e) { e.preventDefault(); });
     img.decoding = "async";
     img.src = page.poster || "";
-    img.alt = "Stairway Shuffle — tap Start to play";
+    img.alt = "PowerUp Bots — tap Start to play";
     return img;
   }
   const media = page.type === "video"
@@ -276,15 +276,16 @@ const replayBtn   = document.getElementById("replayBtn");   // lives on the THE 
 const homeBtn     = document.getElementById("homeBtn");
 
 /* ==========================================================================
-   LBD OVERLAY  —  the Stairway Shuffle game embedded as one page.
+   LBD OVERLAY  —  the PowerUp Bots game embedded as one page.
    The game lives in a body-level iframe (#lbdStage) so it can grow to true
    fullscreen (a transform on .flip-scale would otherwise trap position:fixed).
    • pre-LBD  : the overlay is sized/positioned OVER the current page rectangle,
                 so the game's home screen looks like it's printed inside the book.
    • start    : the game posts {source:"lbd", type:"lbd-start"} → we expand the
                 overlay to fill the whole screen.
-   • end/skip : the game posts {source:"lbd", type:"lbd-complete"} → we shrink the
-                overlay back into the page and auto-flip to the next page.
+   • end/skip : the game posts {type:"activity_complete"} → after its win
+                celebration we reveal the "Next" button; tapping it drops the overlay
+                and turns straight to the next page.
    ========================================================================== */
 const lbdStage   = document.getElementById("lbdStage");
 const lbdFrame   = document.getElementById("lbdFrame");
@@ -347,7 +348,7 @@ function setLbdFullscreen(on) {
 // Show the overlay + LOAD the game ONLY once we've fully landed on the LBD page,
 // and UNLOAD it the moment we leave. The game is never loaded on approach: it
 // autoplays its title voice-over / background music as soon as it loads, so
-// loading it early would leak "Stairway Shuffle" audio onto the previous page.
+// loading it early would leak "PowerUp Bots" audio onto the previous page.
 function updateLbdOverlay() {
   if (LBD_INDEX < 0 || !lbdStage) return;
   const onLbd = opened && ready && !animating && flipped === LBD_INDEX;
@@ -371,17 +372,22 @@ function updateLbdOverlay() {
     }
   }
 }
-// Game finished: shrink the game back out of full screen and then automatically
-// turn to the next story page.
+// Game finished + child tapped Next: leave full screen and turn to the next story
+// page IMMEDIATELY (no shrink-back morph, no wait).
 function exitLbd() {
   if (lbdExiting) return;
   lbdExiting = true;
-  setLbdFullscreen(false);                // shrink the game back into the page
-  setTimeout(function () {
-    lbdExiting = false;
-    playBgMusic();                        // bring the flipbook's background music back
-    if (flipped === LBD_INDEX) goNext();  // auto-advance to the next story page
-  }, 470);                                // just after the shrink transition (.4s)
+  playBgMusic();                          // bring the flipbook's background music back
+  // Drop out of full screen (snap, not animate) and start the page turn in the SAME
+  // frame — so tapping Next jumps straight to the next page. goNext → refreshMedia →
+  // updateLbdOverlay then hides + unloads the game as we leave the LBD page. Removing
+  // .visible hides the overlay instantly (visibility isn't transitioned), so there's
+  // no fade left covering the flip; the JS runs in one frame, so no flash either.
+  lbdFullscreen = false;
+  lbdStage.classList.remove("lbd-anim", "fullscreen");
+  document.body.classList.remove("lbd-fullscreen");
+  if (flipped === LBD_INDEX) goNext();    // begin the flip to the next story page NOW
+  lbdExiting = false;                     // re-arm for the next visit (goNext already left the page)
 }
 // How long to let the game's own win celebration ("Bots Powered Up!") play before
 // the "Next" button pops in over it.
@@ -766,12 +772,12 @@ cornerPrev.addEventListener("click", function (e) { e.stopPropagation(); goPrev(
 cornerNext.addEventListener("click", function (e) { e.stopPropagation(); goNext(); this.blur(); });
 if (replayBtn) replayBtn.addEventListener("click", function (e) { e.stopPropagation(); replayBook(); this.blur(); });
 if (homeBtn) homeBtn.addEventListener("click", function (e) { e.stopPropagation(); goHome(); this.blur(); });
-// Game-complete "Next" button: hide it, shrink the game away, and turn back to
-// the flipbook (the next story page). Only present after the game reports complete.
+// Game-complete "Next" button: hide it, drop the game overlay, and turn STRAIGHT to
+// the next story page. Only present after the game reports complete.
 if (lbdNextBtn) lbdNextBtn.addEventListener("click", function (e) {
   e.stopPropagation();
   hideLbdNext();
-  exitLbd();                 // shrink out of full screen → auto-advance to the next page
+  exitLbd();                 // drop the overlay → turn straight to the next page
   this.blur();
 });
 
