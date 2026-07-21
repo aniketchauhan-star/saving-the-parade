@@ -853,7 +853,7 @@
   }
 
   /* ==========================================================================
-     LBD GAME OVERLAY  —  the embedded Stairway Shuffle game.
+     LBD GAME OVERLAY  —  the embedded PowerUp Bots game.
      A body-level iframe (NOT inside the 3D book) so it can expand to a true
      full-screen box. JS gives it left/top/width/height matching the page for the
      pre-LBD look; adding .fullscreen makes it fill the whole viewport.
