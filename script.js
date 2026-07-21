@@ -286,12 +286,14 @@ const homeBtn     = document.getElementById("homeBtn");
    • end/skip : the game posts {source:"lbd", type:"lbd-complete"} → we shrink the
                 overlay back into the page and auto-flip to the next page.
    ========================================================================== */
-const lbdStage = document.getElementById("lbdStage");
-const lbdFrame = document.getElementById("lbdFrame");
+const lbdStage   = document.getElementById("lbdStage");
+const lbdFrame   = document.getElementById("lbdFrame");
+const lbdNextBtn = document.getElementById("lbdNextBtn");   // shown only once the game completes
 let lbdFullscreen = false;   // is the overlay expanded to full screen right now?
 let lbdStarted    = false;   // has the child tapped Start at least once this visit?
 let lbdWasOn      = false;   // was the overlay showing on the previous refresh?
 let lbdExiting    = false;   // guard so "complete" only advances once
+let lbdCompleted  = false;   // has the game reported complete this visit? (arms the Next button)
 
 // Show the blurred pre-LBD backdrop inside the frame while the game is loading
 // (and while it's unloaded) so there is no dark flash — it matches the game's
@@ -305,10 +307,16 @@ function ensureLbdLoaded() {
   lbdFrame.src = pages[LBD_INDEX].src;
   lbdFrame.dataset.loaded = "1";
 }
+// Reveal / hide the game-complete "Next" button (bottom-centre of the overlay).
+function showLbdNext() { if (lbdNextBtn) lbdNextBtn.classList.add("show"); }
+function hideLbdNext() { if (lbdNextBtn) lbdNextBtn.classList.remove("show"); }
 // Unload the game so the NEXT visit starts fresh at the pre-LBD home screen.
 function resetLbd() {
   if (!lbdFrame) return;
   lbdStarted = false;
+  lbdCompleted = false;                 // re-arm: the Next button is gated on a fresh completion
+  hideLbdNext();                        // never carry a stale Next button into the next visit
+  clearTimeout(_lbdCompleteTimer); _lbdCompleteTimer = null;
   lbdFrame.src = "about:blank";
   lbdFrame.dataset.loaded = "";
 }
@@ -376,12 +384,13 @@ function exitLbd() {
   }, 470);                                // just after the shrink transition (.4s)
 }
 // How long to let the game's own win celebration ("Bots Powered Up!") play before
-// we shrink out and turn the page.
+// the "Next" button pops in over it.
 const LBD_CELEBRATE_MS = 3800;
 let _lbdCompleteTimer = null;
 // Listen for the game's messages. The game posts { type: "activity_complete" } when
 // the child finishes; older builds posted { source:"lbd", type:"lbd-complete" }.
-// Either one ends the game → (after a short celebration) advance to the next page.
+// Either one ends the game → after the win celebration, reveal the "Next" button.
+// The book does NOT auto-advance: the child taps Next to return to the flipbook.
 window.addEventListener("message", function (e) {
   const d = e && e.data;
   if (!d) return;
@@ -390,10 +399,13 @@ window.addEventListener("message", function (e) {
   if (d.source === "lbd" && d.type === "lbd-start") {   // (kept for compatibility)
     lbdStarted = true; setLbdFullscreen(true);
   } else if (isComplete) {
-    if (lbdExiting || _lbdCompleteTimer) return;        // only advance once
+    if (lbdExiting || _lbdCompleteTimer || lbdCompleted) return;   // handle completion once
+    lbdCompleted = true;
+    // Let the game's win celebration finish, THEN reveal the Next button so the
+    // child decides when to head back to the story.
     _lbdCompleteTimer = setTimeout(function () {
       _lbdCompleteTimer = null;
-      exitLbd();
+      showLbdNext();
     }, LBD_CELEBRATE_MS);
   }
 });
@@ -754,6 +766,14 @@ cornerPrev.addEventListener("click", function (e) { e.stopPropagation(); goPrev(
 cornerNext.addEventListener("click", function (e) { e.stopPropagation(); goNext(); this.blur(); });
 if (replayBtn) replayBtn.addEventListener("click", function (e) { e.stopPropagation(); replayBook(); this.blur(); });
 if (homeBtn) homeBtn.addEventListener("click", function (e) { e.stopPropagation(); goHome(); this.blur(); });
+// Game-complete "Next" button: hide it, shrink the game away, and turn back to
+// the flipbook (the next story page). Only present after the game reports complete.
+if (lbdNextBtn) lbdNextBtn.addEventListener("click", function (e) {
+  e.stopPropagation();
+  hideLbdNext();
+  exitLbd();                 // shrink out of full screen → auto-advance to the next page
+  this.blur();
+});
 
 // Page interaction — DRAG TO TURN: grab the page and it follows your cursor,
 // rotating about the spine, then SNAPS to the nearest state when you let go.

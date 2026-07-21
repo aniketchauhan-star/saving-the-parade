@@ -186,6 +186,12 @@
      reports it is complete. -->
 <div class="lbd-stage" id="lbdStage" aria-hidden="true">
   <iframe id="lbdFrame" title="Stairway Shuffle game" allow="autoplay; fullscreen" allowfullscreen></iframe>
+  <!-- "Next" button — hidden while the game is played; revealed ONLY once the game
+       reports it is complete. Tapping it shrinks the game away and turns back to
+       the flipbook (the next story page). -->
+  <button class="lbd-next-btn" id="lbdNextBtn" type="button" aria-label="Next — back to the story">
+    <img src="assets/next%20button.webp" alt="Next" draggable="false" />
+  </button>
 </div>
 
 <!-- Inlined one-shot SFX (base64) for glitch-free Web Audio playback on file:// -->
