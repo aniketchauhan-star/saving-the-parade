@@ -159,32 +159,53 @@
      no rounded pill. Only the arrow glyph shows, same position/size, clickable. */
   /* Flip arrows OUTSIDE the book, fixed at the viewport's bottom corners. */
   .corner-arrow {
-    position: fixed; bottom: clamp(-16px, -0.9vh, -6px); z-index: 700;  /* nudged a bit lower */
-    width: clamp(52px, 6vw, 70px); height: clamp(52px, 6vw, 70px);
+    position: fixed; bottom: clamp(-10px, -0.5vh, -2px); z-index: 700;
+    width: clamp(84px, 10vw, 124px); height: clamp(84px, 10vw, 124px);
     border: none; background: none; color: var(--glow);        /* neon teal — futuristic, high contrast */
     filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 9px rgba(47,230,214,0.6));  /* teal glow */
     display: none; align-items: center; justify-content: center;
     cursor: pointer; opacity: 0;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
     transition: opacity 400ms ease, transform 150ms ease;
   }
   body.is-open .corner-arrow { display: flex; opacity: 0.96; }
+  /* FIRST STORY PAGE: the Back arrow is fully removed (not disabled/faded), and
+     the Next arrow stays completely hidden until the page's video AND its
+     required interaction are complete (JS toggles .is-visible). */
+  body.is-open .corner-arrow.back.is-hidden { display: none !important; }
+  body.is-open .corner-arrow.fwd:not(.is-visible) { display: none !important; }
+  /* When the forward arrow earns its reveal, it fades in with a gentle pop.
+     NO forwards fill and :not([disabled]) scope — a filling animation would own
+     `opacity` forever and override the 0.22 disabled style on later pages. */
+  body.is-open .corner-arrow.fwd.is-visible:not([disabled]) {
+    animation: arrowReveal 400ms cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
+  }
+  @keyframes arrowReveal {
+    0%   { opacity: 0; transform: scale(0.55); }
+    70%  { opacity: 1; transform: scale(1.08); }
+    100% { opacity: 0.96; transform: scale(1); }
+  }
 
-  /* HOME button — top-left, moon-gold like the arrows. JS toggles .show (only
-     while reading; hidden on the cover, the last page and the end). */
+  /* HOME button — top-right margin, same visual weight as the arrows. JS toggles
+     .show (only while reading; hidden on the cover, the last page and the end). */
   .home-btn {
-    position: fixed; top: clamp(2px, 0.6vh, 8px); right: clamp(8px, 1.6vw, 22px); z-index: 720;
-    width: clamp(40px, 4.6vw, 56px); height: clamp(40px, 4.6vw, 56px);
+    position: fixed; top: clamp(-12px, -0.9vh, -4px); right: clamp(8px, 1.6vw, 22px); z-index: 720;
+    width: clamp(84px, 10vw, 124px); height: clamp(84px, 10vw, 124px);
     border: none; background: none; color: var(--glow);
     filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 9px rgba(47,230,214,0.6));
     display: none; align-items: center; justify-content: center;
     cursor: pointer; opacity: 0; padding: 0;
-    transition: opacity 360ms ease, transform 150ms ease;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+    transition: opacity 400ms ease, transform 150ms ease;
   }
   .home-btn.show   { display: flex; opacity: 0.96; }
-  .home-btn:hover  { transform: scale(1.1); }
+  .home-btn:hover  { transform: scale(1.12); }
   .home-btn:active { transform: scale(0.9); }
-  .home-btn:focus, .home-btn:focus-visible { outline: none; }
-  .home-btn svg { width: 92%; height: 92%; }
+  .home-btn:focus, .home-btn:focus-visible { outline: none; box-shadow: none; }
+  .home-btn[disabled] { opacity: 0.22; pointer-events: none; }
+  .home-btn svg { width: 65%; height: 65%; }
 
   /* While the viewport is actively resizing / the resolution is changing, freeze
      the page-turn transitions so the book can't appear to auto-flip (JS adds
@@ -199,17 +220,24 @@
      around the arrow. (Flipping still works via keys, drag, and the arrows.) */
   .corner-arrow:focus,
   .corner-arrow:focus-visible { outline: none; box-shadow: none; }
-  .corner-arrow[disabled] { opacity: 0.22; pointer-events: none; }
+  /* animation:none — a leftover blink/reveal animation (they animate opacity)
+     must never keep flashing an arrow that has just become disabled.
+     opacity !important — `body.is-open .corner-arrow` (0,2,1) would otherwise
+     out-rank this (0,2,0) rule and keep disabled arrows at full 0.96 opacity. */
+  .corner-arrow[disabled] { opacity: 0.22 !important; pointer-events: none; animation: none !important; }
   .corner-arrow.back { left: clamp(12px, 2.5vw, 34px); }
   .corner-arrow.fwd  { right: clamp(12px, 2.5vw, 34px); }
-  .corner-arrow svg  { width: 58%; height: 58%; }
+  /* ONE arrow asset; the glyph fills ~62% of the button box. The BACK version is
+     the same glyph mirrored on the INNER element (scaleX(-1)) so the button's own
+     hover/active scale transforms can never overwrite the mirroring. */
+  .corner-arrow svg  { width: 62%; height: 62%; }
   .corner-arrow.back svg { transform: scaleX(-1); }   /* mirror the forward arrow */
 
   /* ---- Page-turn hint (hand on the RIGHT side of the book) -------------------
      Guidance for HOW to turn the page: a 3D hand on the book's right edge does a
      right-to-left SWIPE, shown together with the "ghost" page-flip. JS positions
      it against the book's right side (see positionFlipHint) and toggles .show.
-     Drop your art at assets/hand-nudge.png; until then an emoji hand is used. */
+     Rendered as the emoji hand (no image request — no art file is shipped). */
   .flip-hint {
     position: fixed; z-index: 720; pointer-events: none;
     width: clamp(56px, 7vw, 104px); height: auto;
@@ -601,7 +629,7 @@
      recessed slightly so it reads as a picture plate set into the hardcover. */
   .cover .front .cover-img {
     position: absolute; inset: 54px; z-index: 0; border-radius: 5px;
-    background: url("assets/cover%20%20page.png") center / cover no-repeat;
+    background: url("assets/cover-page.webp") center / cover no-repeat;
     box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 3px 10px rgba(0,0,0,0.45),
                 inset 0 0 0 1px rgba(0,0,0,0.35);
   }
@@ -717,7 +745,44 @@
     filter: drop-shadow(0 12px 18px rgba(6,4,26,0.55));   /* soft lift off the cover */
   }
   .play-btn:active { filter: brightness(0.95); transform: translate(-50%, -50%) scale(0.95); }
-  .play-btn:focus-visible { outline: none; }
+  .play-btn:focus, .play-btn:focus-visible { outline: none; box-shadow: none; }
+
+  /* ---- Stage-A boot: while the shell assets preload, the Play button is hidden
+     and the themed loader bar sits in its place. When Stage A hits 100% the body
+     class flips (boot-loading → boot-ready): the bar goes, the button POPS in. */
+  body.boot-loading .play-btn { display: none; }
+  body.boot-ready .play-btn { animation: playPopIn 480ms cubic-bezier(0.34, 1.5, 0.64, 1) both,
+                                         playBreathe 2.4s ease-in-out 520ms infinite; }
+  @keyframes playPopIn {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+    70%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  .boot-loader {
+    position: absolute; left: 51%; top: 76%; transform: translate(-50%, -50%);
+    z-index: 2; width: clamp(200px, 26vw, 330px);
+    display: none; flex-direction: column; align-items: center; gap: 10px;
+    pointer-events: none;
+  }
+  body.boot-loading .boot-loader { display: flex; }
+  .boot-loader-track {
+    width: 100%; height: 14px; border-radius: 999px;
+    background: rgba(10, 15, 45, 0.72);
+    border: 1.5px solid rgba(47, 230, 214, 0.75);            /* HUD teal rule */
+    box-shadow: 0 0 14px rgba(47, 230, 214, 0.35), inset 0 0 8px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+  }
+  .boot-loader-fill {
+    width: 0%; height: 100%; border-radius: inherit;
+    background: linear-gradient(90deg, #2fe6d6, #8a5cff);    /* teal → violet, like the cover frame */
+    box-shadow: 0 0 12px rgba(138, 92, 255, 0.8);
+    transition: width 180ms ease-out;                        /* monotonic — width only ever grows */
+  }
+  .boot-loader-label {
+    font-family: var(--font-head, "Fredoka", sans-serif); font-weight: 600;
+    font-size: clamp(13px, 1.6vw, 17px); letter-spacing: 0.06em;
+    color: #eafffb; text-shadow: 0 0 10px rgba(47, 230, 214, 0.8), 0 2px 6px rgba(0,0,0,0.6);
+  }
   /* BREATHING — the button slowly grows and glows, then settles, like a calm
      breath. transform keeps the centre placement; a soft cyan glow swells too. */
   @keyframes playBreathe {
@@ -749,6 +814,17 @@
     will-change: transform;
   }
   .leaf.flipped { transform: rotateY(-180deg); }
+  /* GPU PAGE WINDOWING (script.js windowLeaves): leaves more than one step from
+     the current page release their compositor layers. visibility (not display)
+     so the flip engine's layout/stacking is untouched; will-change:auto drops
+     the standing layer hint; pointer-events:none so hidden sheets can't catch
+     drags. Re-applied on every arrival/settle/home/LBD toggle/resize. */
+  .leaf.win-off {
+    visibility: hidden;
+    will-change: auto;
+    pointer-events: none;
+  }
+  .leaf.win-off .page-media { will-change: auto; }
 
   .leaf .face {
     position: absolute; inset: 0; overflow: hidden;
@@ -890,52 +966,13 @@
     border: 0; display: block; background: #0a0f2d;
   }
   /* While the game is full screen, get ALL the book chrome out of the way so the
-     game owns the whole screen (arrows, toolbar, Home button, page-turn hint). */
-  body.lbd-fullscreen .corner-arrow,
-  body.lbd-fullscreen .toolbar,
-  body.lbd-fullscreen .home-btn,
-  body.lbd-fullscreen .flip-hint { display: none !important; }
-
-  /* ---- "Next" button (game-complete) ---------------------------------------
-     Lives inside the game overlay, pinned bottom-centre. Hidden while playing;
-     shown (JS adds .show) only after the game reports it is complete. Tapping it
-     returns to the flipbook. It pops in, then gently pulses to invite the tap. */
-  .lbd-next-btn {
-    position: absolute;
-    left: 50%; bottom: 5%;
-    transform: translateX(-50%);
-    z-index: 5;                          /* above #lbdFrame, inside the overlay */
-    display: none;                       /* revealed by JS on game complete */
-    padding: 0; margin: 0; border: 0; background: none;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .lbd-next-btn img {
-    display: block;
-    width: clamp(160px, 24vw, 260px);
-    height: auto;
-    filter: drop-shadow(0 10px 22px rgba(0,0,0,0.45));
-    pointer-events: none;                /* the button element takes the tap */
-    -webkit-user-select: none; user-select: none;
-    -webkit-user-drag: none; user-drag: none;
-  }
-  .lbd-next-btn.show {
-    display: block;
-    animation: lbdNextIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both,
-               lbdNextPulse 1.8s ease-in-out 0.6s infinite;
-  }
-  .lbd-next-btn.show:active { filter: brightness(0.95); }
-  @keyframes lbdNextIn {
-    from { opacity: 0; transform: translateX(-50%) scale(0.6); }
-    to   { opacity: 1; transform: translateX(-50%) scale(1); }
-  }
-  @keyframes lbdNextPulse {
-    0%, 100% { transform: translateX(-50%) scale(1); }
-    50%      { transform: translateX(-50%) scale(1.06); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .lbd-next-btn.show { animation: lbdNextIn 0.3s ease both; }
-  }
+     game owns the whole screen (arrows, toolbar, Home button, page-turn hint) —
+     and block background page scrolling outright. */
+  body.lbd-is-fullscreen .corner-arrow,
+  body.lbd-is-fullscreen .toolbar,
+  body.lbd-is-fullscreen .home-btn,
+  body.lbd-is-fullscreen .flip-hint { display: none !important; }
+  body.lbd-is-fullscreen { overflow: hidden; }
 
   /* ---- Speech bubble (SVG) --------------------------------------------------
      A white comic bubble with a black outline + purple neon glow and a tail,
@@ -998,20 +1035,8 @@
     text-wrap: balance;
   }
 
-  /* Crop maths per bubble (derived from the measured bounding boxes). Height is
-     locked to the bubble's aspect ratio; bg-size/position show only the bbox. */
-  .bubble.neel       { height: calc(var(--w) * 0.6972); }
-  .bubble.neel       .bubble-bg {
-    background-image: url("assets/neel dialogue box for one time..webp");
-    background-size: calc(var(--w) * 2.2272) auto;
-    background-position: calc(var(--w) * -0.7621) calc(var(--w) * -0.2645);
-  }
-  .bubble.everywhere { height: calc(var(--w) * 0.7067); }
-  .bubble.everywhere .bubble-bg {
-    background-image: url("assets/dialogue box for everywhere..webp");
-    background-size: calc(var(--w) * 2.1501) auto;
-    background-position: calc(var(--w) * -0.5756) calc(var(--w) * -0.2385);
-  }
+  /* (The old .bubble.neel / .bubble.everywhere artwork crops were removed: their
+     image files are not part of this project, so the rules could only 404.) */
 
   /* Pop-in reveal: the bubble scales up from small with a springy overshoot and
      fades in — played once the page has fully settled ("for one time"). */
@@ -1023,23 +1048,8 @@
   }
 
   /* ==========================================================================
-     CONTROLS  —  arrows, progress read-out, mute toggle
+     CONTROLS
      ========================================================================== */
-  .arrow {
-    position: fixed; top: 50%; transform: translateY(-50%);
-    width: clamp(42px, 6vw, 60px); height: clamp(42px, 6vw, 60px);
-    border: none; border-radius: 50%; background: rgba(255,255,255,0.85);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.18);
-    font-size: clamp(20px, 3vw, 30px); color: var(--cover-2);
-    cursor: pointer; z-index: 700; display: none;
-    align-items: center; justify-content: center;
-    transition: transform 140ms ease, background 140ms ease, opacity 200ms ease;
-  }
-  .arrow:hover  { background: #fff; transform: translateY(-50%) scale(1.08); }
-  .arrow:active { transform: translateY(-50%) scale(0.94); }
-  .arrow:disabled { opacity: 0.3; cursor: default; }
-  .arrow.prev { left: clamp(6px, 3vw, 34px); } .arrow.next { right: clamp(6px, 3vw, 34px); }
-  body.is-open .arrow { display: flex; }
 
   /* Fixed at the bottom-centre (out of the column flow) so the book can sit dead-
      centre in the viewport instead of being pushed up by this row. */

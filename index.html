@@ -15,6 +15,9 @@
   ============================================================================
 -->
 <html lang="en">
+<!-- Media formats: story videos are WebM (VP9/Opus) and audio is Ogg/Opus —
+     both supported by Chrome, Edge, Firefox and recent Safari versions.
+     Images are WebP (universal in evergreen browsers). -->
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
@@ -32,7 +35,7 @@
 <link rel="stylesheet" href="styles.css" />
 </head>
 
-<body>
+<body class="boot-loading">
 <!-- Landscape lock: on phones/tablets (touch), the book shows only in landscape.
      In portrait the scene is hidden and this rotate prompt is shown instead. -->
 <div class="rotate-notice" id="rotateNotice">
@@ -123,9 +126,19 @@
                 <div class="back-fill"></div>
                 <div class="curl"></div>
                 <button class="play-btn" id="hint" type="button" aria-label="Play — open the book">
-                  <!-- Custom play-button artwork (assets/play-button.png). -->
-                  <img class="play-img" src="assets/play-button.png" alt="Play" draggable="false" />
+                  <!-- Custom play-button artwork (assets/play-button.webp). -->
+                  <img class="play-img" src="assets/play-button.webp" alt="Play" draggable="false" />
                 </button>
+                <!-- Stage-A shell preloader — a themed HUD progress bar shown in the
+                     Play button's place while the shell assets stream in. The Play
+                     button is revealed (with a pop) only at 100%. -->
+                <div class="boot-loader" id="bootLoader" role="progressbar"
+                     aria-label="Loading the story" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                  <div class="boot-loader-track">
+                    <div class="boot-loader-fill" id="bootLoaderFill"></div>
+                  </div>
+                  <div class="boot-loader-label" id="bootLoaderLabel">Loading&hellip;</div>
+                </div>
               </div>
               <!-- BACK of the front cover: intentionally BLANK (plain dark board). -->
               <div class="face back"></div>
@@ -174,28 +187,24 @@
   </svg>
 </button>
 
-<!-- (legacy hidden nav elements kept only so existing JS refs stay valid) -->
-<button class="arrow prev" id="prev" aria-label="Previous page">‹</button>
-<button class="arrow next" id="next" aria-label="Next page">›</button>
-
 <!-- ── Embedded LBD game (PowerUp Bots) ──
-     A body-level overlay (NOT inside the 3D book) so it can expand to a true
-     full-screen box — a CSS transform on the book would otherwise trap
-     position:fixed. The engine (script.js) reveals it when you land on the game
-     page, grows it to fullscreen, and turns to the next page once the game
-     reports it is complete. -->
+     A body-level overlay (NOT inside the 3D book, a page leaf, or any transformed
+     wrapper) so it can expand to a true full-screen box — a CSS transform on the
+     book would otherwise trap position:fixed. The iframe starts at about:blank and
+     is warmed in the background after window load (the game is silent on boot).
+     script.js reveals it over the game page's frame when the reader lands there;
+     the game's own "Let's Go" tap (relayed by game/embed-bridge.js as lbd-start)
+     expands it to fullscreen, and lbd-complete returns to the book and advances. -->
 <div class="lbd-stage" id="lbdStage" aria-hidden="true">
-  <iframe id="lbdFrame" title="PowerUp Bots game" allow="autoplay; fullscreen" allowfullscreen></iframe>
-  <!-- "Next" button — hidden while the game is played; revealed ONLY once the game
-       reports it is complete. Tapping it shrinks the game away and turns back to
-       the flipbook (the next story page). -->
-  <button class="lbd-next-btn" id="lbdNextBtn" type="button" aria-label="Next — back to the story">
-    <img src="assets/next%20button.webp" alt="Next" draggable="false" />
-  </button>
+  <iframe id="lbdFrame" title="Interactive learning game" src="about:blank"
+          allow="autoplay; fullscreen" allowfullscreen></iframe>
 </div>
 
 <!-- Inlined one-shot SFX (base64) for glitch-free Web Audio playback on file:// -->
 <script src="sfx-data.js"></script>
+<!-- Two-stage asset preloader (Stage A gates the Play button; Stage B warms
+     later pages + the embedded game in the background). -->
+<script src="preload.js"></script>
 <!-- All behaviour lives in script.js -->
 <script src="script.js"></script>
 </body>

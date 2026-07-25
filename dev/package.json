@@ -1,0 +1,10 @@
+{
+  "name": "saving-the-parade-devtools",
+  "private": true,
+  "description": "Development/QA tooling for the flipbook (server, tests, media pipeline). Not deployed.",
+  "type": "module",
+  "devDependencies": {
+    "@playwright/test": "1.62.0",
+    "playwright": "1.62.0"
+  }
+}
