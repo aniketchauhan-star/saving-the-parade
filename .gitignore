@@ -6,3 +6,10 @@ Desktop.ini
 # Temp / scratch files
 *.tmp
 _test_*.html
+
+# Dev tooling (never deployed; node_modules and heavy reports stay untracked)
+dev/node_modules/
+dev/reports/
+dev/quarantine/
+dev/test-results/
+dev/playwright-report/

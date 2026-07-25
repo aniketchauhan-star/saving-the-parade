@@ -1,0 +1,10 @@
+# Deployment ignore — keep dev tooling, tests, reports, source backups and the
+# original (untouched) LBD source folder OUT of the deployed static site.
+# The deployed payload is: index.html, preload.js, script.js, styles.css,
+# sfx-data.js, asset-manifest.json, assets/, sfx/, game/.
+dev
+LBD 1
+.vscode
+.claude
+.gitignore
+IMPLEMENTATION_REPORT.md

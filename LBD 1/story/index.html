@@ -5245,8 +5245,11 @@
         label: "Triangle",
         /* Per-corner seat calibration [tl, tr, bl, br]: seat centre minus
            (slot centre + TRI_SEAT_NUDGE) from the hand-tuned
-           layout_triangle1_laser (3) export, composed by triSeatNudgeFor. */
-        triSeatNudge: [{ x: 0.7, y: -0.4 }, { x: 1.4, y: -0.6 }, { x: 0, y: 0.1 }, { x: -0.4, y: -0.3 }],
+           layout_triangle1_laser (3) export, composed by triSeatNudgeFor.
+           The calibration belongs to the ART ROTATION, not the corner, so the
+           2026-07-24 reorientation moved the 315° art's value to tr and the
+           45° art's value to br. */
+        triSeatNudge: [{ x: 0.7, y: -0.4 }, { x: -0.4, y: -0.3 }, { x: 0, y: 0.1 }, { x: 0, y: 0.1 }],
         blockSrc: "",
         blockColor: "#FFB35C",
         blockW: 200,
@@ -5265,11 +5268,12 @@
         podLeft: ASSETS + "SquareHollow.webp",
         podRight: ASSETS + "SquareHollow.webp",
         cornerSlot: ASSETS + "triangleHollow.webp",
-        /* Hollows oriented as the X-cut pieces themselves (apex toward centre):
-           TL ▶, TR ▽, BL △, BR ◀ (Figma 35:2446) — so each cut triangle slides
-           straight in without re-orienting. (triangleHollow rotates: 45→△, 135→▶,
-           225→▽, 315→◀.) */
-        cornerRotate: [135, 225, 45, 315],
+        /* Hollows per the 2026-07-24 reference: TL ▶, TR ◀, BL △, BR △ — a
+           mirrored left/right pair up top, two upright seats below. There is no
+           ▽ seat, so the top-quarter piece spins 180° in flight to seat at BR
+           (see TRI_START_CLIP / TRI_SPIN). (triangleHollow rotates: 45→△,
+           135→▶, 225→▽, 315→◀.) */
+        cornerRotate: [135, 315, 45, 45],
         /* Seated-triangle box = this × the hollow's measured (rotated) bbox (~231).
            0.712 ≈ 165px — averaged from the four hand-resized pieces in the
            layout_triangle1_laser (3) export, closing the cavity gap the old
@@ -7003,23 +7007,35 @@
       var ax = (50 + (a[0] - 50) * t).toFixed(2), ay = (50 + (a[1] - 50) * t).toFixed(2);
       return "polygon(" + o[0][0] + "% " + o[0][1] + "%, " + o[1][0] + "% " + o[1][1] + "%, " + ax + "% " + ay + "%)";
     }
-    /* Centred cardinal-triangle clips for triangle1 — the X-cut quarter shape
-       (right-angle apex toward the screen centre), drawn SYMMETRICALLY about the
-       box centre so that centring the box on the slot centres the visible triangle
-       (no rotation, no nudge, no morph). [tl ▶, tr ▽, bl △, br ◀] */
+    /* Centred cardinal-triangle clips for triangle1 — the SEATED shape at each
+       corner, drawn SYMMETRICALLY about the box centre so that centring the box
+       on the slot centres the visible triangle (no nudge, no morph).
+       [tl ▶, tr ◀, bl △, br △] — the 2026-07-24 hollow orientation. */
     var TRI_CARDINAL = [
       "polygon(33.33% 0%, 33.33% 100%, 83.33% 50%)",   /* ▶ apex right */
-      "polygon(0% 33.33%, 100% 33.33%, 50% 83.33%)",   /* ▽ apex down */
+      "polygon(66.67% 0%, 66.67% 100%, 16.67% 50%)",   /* ◀ apex left */
       "polygon(0% 66.67%, 100% 66.67%, 50% 16.67%)",   /* △ apex up */
-      "polygon(66.67% 0%, 66.67% 100%, 16.67% 50%)"    /* ◀ apex left */
+      "polygon(0% 66.67%, 100% 66.67%, 50% 16.67%)"    /* △ apex up */
     ];
-    /* The right-angle apex (box fraction) of each TRI_CARDINAL clip — used to
+    /* The X-cut quarter each piece STARTS as — one each of ▶ ◀ △ ▽, so the four
+       tile the whole block at centre. A seat oriented differently from its cut
+       quarter spins TRI_SPIN degrees in flight; the clips are symmetric about
+       the box centre, so ▽ rotated 180° lands as EXACTLY the seated △ clip. */
+    var TRI_START_CLIP = [
+      "polygon(33.33% 0%, 33.33% 100%, 83.33% 50%)",   /* tl: left quarter ▶ */
+      "polygon(66.67% 0%, 66.67% 100%, 16.67% 50%)",   /* tr: right quarter ◀ */
+      "polygon(0% 66.67%, 100% 66.67%, 50% 16.67%)",   /* bl: bottom quarter △ */
+      "polygon(0% 33.33%, 100% 33.33%, 50% 83.33%)"    /* br: top quarter ▽ */
+    ];
+    var TRI_SPIN = [0, 0, 0, 180];
+    /* The right-angle apex (box fraction) of each TRI_START_CLIP — used to
        assemble the four pieces into a square (all apexes meet at the centre). */
-    var TRI_APEX_FRAC = [[0.8333, 0.5], [0.5, 0.8333], [0.5, 0.1667], [0.1667, 0.5]];
-    /* triangle1 seat nudge (game px, toward the screen centre) — the centred clip's
-       centroid is at the box centre, but the hollow's cardinal triangle sits a bit
-       toward centre, so shift the piece to nest in it. From the layout export. */
-    var TRI_SEAT_NUDGE = [{ x: 26, y: 2 }, { x: -3, y: 27 }, { x: 2, y: -26 }, { x: -26, y: -2 }];
+    var TRI_APEX_FRAC = [[0.8333, 0.5], [0.1667, 0.5], [0.5, 0.1667], [0.5, 0.8333]];
+    /* triangle1 seat nudge (game px) — the centred clip's centroid is at the box
+       centre, but the hollow's cardinal triangle sits a bit toward its apex, so
+       shift the piece to nest in it. Measured per ART ROTATION in the layout
+       export (tr/br remapped with the 2026-07-24 reorientation). */
+    var TRI_SEAT_NUDGE = [{ x: 26, y: 2 }, { x: -26, y: -2 }, { x: 2, y: -26 }, { x: 2, y: -26 }];
     /* Effective per-corner seat nudge for a round: the shared TRI_SEAT_NUDGE
        plus the round's own calibrated triSeatNudge (drag deltas from a
        debug-overlay layout export), so one round can be tuned without moving
@@ -7041,7 +7057,8 @@
       d.className = "flying-half tri-piece";
       d.style.background = r.blockColor || "#ED9CFF";
       /* diamond morphs through triClipAt; triangle1 uses the fixed centred cardinal
-         clip (the cut shape) — it just slides in, never changing shape. */
+         SEATED clip. Flight code that assembles the pieces into the whole block
+         first swaps in TRI_START_CLIP and spins TRI_SPIN on the way to the seat. */
       d.style.clipPath = r.diamondHollows ? triClipAt(cornerIdx, t == null ? 1 : t) : (TRI_CARDINAL[cornerIdx] || TRI_CARDINAL[0]);
       d.style.borderRadius = "0";
       d.style.filter = "none";
@@ -8540,6 +8557,9 @@
           var box = triSeatBox(r, sc);
           var piece = makeCornerTriangle(r, i, box.w, box.h, r.diamondHollows ? 0 : 1);
           piece.style.position = "absolute";
+          /* triangle1 previews as its CUT quarter, spinning into the seat like
+             the real flight (▽→△ at br); t bouncing back un-spins it. */
+          if (!r.diamondHollows) { piece.style.clipPath = TRI_START_CLIP[i]; }
           /* Assemble as a square: place each piece so its apex meets at the centre. */
           var pStartScale = (r.blockW || 200) / box.w;
           var paf = (!r.diamondHollows && TRI_APEX_FRAC[i]) ? TRI_APEX_FRAC[i] : [0.5, 0.5];
@@ -8573,7 +8593,7 @@
           /* start ASSEMBLED at block size (the four cut quarters tile a clean
              square at centre); the bounce then carries them out to the hollows. */
           piece.style.transform = "scale(" + pStartScale.toFixed(3) + ")";
-          anims.push({ piece: piece, sx: sCx, sy: sCy, cx2: ctlX, cy2: ctlY, ex: ex, ey: ey, diag: true, corner: i, startScale: pStartScale });
+          anims.push({ piece: piece, sx: sCx, sy: sCy, cx2: ctlX, cy2: ctlY, ex: ex, ey: ey, diag: true, corner: i, startScale: pStartScale, spin: r.diamondHollows ? 0 : (TRI_SPIN[i] || 0) });
         });
       } else {
         [0, 1, 2, 3].forEach(function (i) {
@@ -8631,9 +8651,10 @@
         var tx = (px - a.sx).toFixed(1), ty = (py - a.sy).toFixed(1);
         if (a.diag) {
           var s = a.startScale + (1 - a.startScale) * t;
-          a.piece.style.transform = "translate(" + tx + "px," + ty + "px) scale(" + s.toFixed(3) + ")";
-          /* triangle1 keeps its constant shape (clip on the rotated inner, no morph)
-             and just slides in; diamond opens out (t=0 tiles → t=1 seats). */
+          a.piece.style.transform = "translate(" + tx + "px," + ty + "px) scale(" + s.toFixed(3) + ") rotate(" + (a.spin * t).toFixed(1) + "deg)";
+          /* triangle1 slides in as its cut quarter, spinning where the seat's
+             orientation differs (br ▽→△); diamond opens out (t=0 tiles → t=1
+             seats) via clip morph instead. */
           if (r.diamondHollows) { a.piece.style.clipPath = triClipAt(a.corner, t); }
         } else {
           var scX = 1 + (a.seatX - 1) * t, scY = 1 + (a.seatY - 1) * t;
@@ -9031,7 +9052,7 @@
       }
 
       if (step.duration) {
-        later(nextStep, step.duration);
+        later(nextStepAfterVO, step.duration);
       }
     }
 
@@ -9041,6 +9062,24 @@
         state.step = FLOW.length - 1;
       }
       renderStep();
+    }
+
+    /* Auto-advance guard: never let a scene's duration timer cut off its own
+       instruction VO. If the mapped line is still playing when the beat's
+       duration elapses — e.g. the lab-gate delayed its start (~2s), or a
+       first-play load pushed it late — wait for the audio to finish before
+       advancing (the next scene's setInstruction would otherwise force-stop
+       it). Beats whose VO already ended (duration > audio, the quiet-beat
+       case) advance immediately, so pacing is unchanged. The captured step
+       guards against a stale ended/fallback callback double-advancing. */
+    function nextStepAfterVO() {
+      var a = _instructionAudioCurrent;
+      if (!a || a.ended || a.paused) { nextStep(); return; }
+      var stepAtSchedule = state.step;
+      whenInstructionAudioEnds(a, function () {
+        if (state.step !== stepAtSchedule) { return; }
+        nextStep();
+      });
     }
 
     /* ── Tutorial guided sequence (2 cuts → 4 quarters) ──
@@ -10001,6 +10040,11 @@
           piece.classList.add("flying-half");
           piece.style.position = "absolute";
           piece.style.transition = "transform .8s cubic-bezier(.18,.89,.32,1.08), clip-path .8s cubic-bezier(.18,.89,.32,1.08), opacity .4s ease";
+          /* triangle1 starts as its CUT quarter and spins into the seat (▽→△ at
+             br); keeping the same transform-function list on both ends makes the
+             transition interpolate translate/scale/rotate independently. */
+          var spin = r.diamondHollows ? 0 : (TRI_SPIN[i] || 0);
+          if (!r.diamondHollows) { piece.style.clipPath = TRI_START_CLIP[i]; }
           var startScale = (r.blockW || 200) / box.w;   /* read block-sized at centre, shrink to cavity */
           /* triangle1 starts ASSEMBLED as a square: place each piece so its apex
              (the centred cardinal clip's right-angle point) sits at the block
@@ -10011,19 +10055,19 @@
           var startCy = center.y - (af[1] - 0.5) * box.h * startScale;
           piece.style.left = (startCx - box.w / 2) + "px";
           piece.style.top = (startCy - box.h / 2) + "px";
-          piece.style.transform = "scale(" + startScale.toFixed(3) + ")";
+          piece.style.transform = "translate(0px,0px) scale(" + startScale.toFixed(3) + ") rotate(0deg)";
           layer.appendChild(piece);
           var tnu = triSeatNudgeFor(r, i);
           var dx = (sc.x + dnx + tnu.x) - startCx, dy = (sc.y + dny + tnu.y) - startCy;
           setTimeout(function () {
             requestAnimationFrame(function () {
               if (success) {
-                piece.style.transform = "translate(" + dx.toFixed(1) + "px," + dy.toFixed(1) + "px) scale(1)";
-                /* diamond morphs to its seated corner triangle; triangle1's shape is
-                   constant (clip on its rotated inner) and just slides into the hollow. */
+                piece.style.transform = "translate(" + dx.toFixed(1) + "px," + dy.toFixed(1) + "px) scale(1) rotate(" + spin + "deg)";
+                /* diamond morphs to its seated corner triangle; triangle1 slides
+                   into the hollow, spinning only where the seat needs it (br). */
                 if (r.diamondHollows) { piece.style.clipPath = triClipAt(i, 1); }
               } else {
-                piece.style.transform = "translate(" + (dx * 0.5).toFixed(1) + "px," + (dy * 0.5).toFixed(1) + "px) scale(" + (startScale * 0.7).toFixed(3) + ")";
+                piece.style.transform = "translate(" + (dx * 0.5).toFixed(1) + "px," + (dy * 0.5).toFixed(1) + "px) scale(" + (startScale * 0.7).toFixed(3) + ") rotate(" + (spin * 0.5) + "deg)";
                 if (r.diamondHollows) { piece.style.clipPath = triClipAt(i, 0.5); }
                 piece.classList.add("soft-mismatch");
               }
@@ -11530,5 +11574,4 @@
 
 
 </body>
-
 </html>
