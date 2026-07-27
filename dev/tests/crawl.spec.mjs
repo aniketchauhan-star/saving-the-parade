@@ -52,13 +52,12 @@ test("crawl every page: no errors, media healthy, gates release, nav state corre
       await expect(page.locator("#cornerPrev")).toBeEnabled();
     }
     if (isLast) {
-      // THE END: forward arrow visible but disabled; Home hidden (Replay owns the page)
+      // THE END: forward arrow visible but disabled; Replay owns the page.
       await expect(page.locator("#cornerNext")).toBeDisabled();
-      await expect(page.locator("#homeBtn")).toBeHidden();
       await expect(page.locator(".replay-btn")).toBeVisible();
-    } else {
-      await expect(page.locator("#homeBtn")).toBeVisible();
     }
+    // There is no Home button any more — the chrome is the two corner arrows only.
+    expect(await page.locator("#homeBtn").count(), "Home button must not exist").toBe(0);
 
     await page.screenshot({ path: testInfo.outputPath(`crawl-page-${idx + 1}.png`) });
 

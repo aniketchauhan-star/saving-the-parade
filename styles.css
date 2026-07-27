@@ -29,6 +29,37 @@
     /* The book's physical thickness (depth of the page block) */
     --thick: clamp(22px, 3.4vw, 48px);
 
+    /* -- CONTROL LANE TOKENS -------------------------------------------------
+       ONE source of truth for every fixed control (Back / Next / the game's own
+       Next). Every offset and size below is derived from these, so the chrome
+       can never drift into two different lanes again.
+
+       --ctl scales on the SMALLER AXIS: `min(8.5vw, 13vh)`. Sizing on vw ALONE
+       is what broke 1366x768 laptops and landscape tablets — the button stayed
+       at its 124px ceiling while the vertical room collapsed, so the bottom
+       band ran out of space and the corners overlapped the page. Now a short
+       screen shrinks the button instead. 52px floor + the 44px min-width/height
+       backstop on each button keep a real touch target at every size.
+
+       Offsets are NON-NEGATIVE (see the trimmed SVG viewBoxes in index.html:
+       the glyph artwork is cropped to its ink, so nothing has to be pulled off
+       screen to hide dead padding). Every edge inset adds the matching
+       env(safe-area-inset-*) so notches / rounded corners / the iPad home
+       indicator never clip a control. */
+    --ctl:       clamp(52px, min(8.5vw, 13vh), 112px);   /* button box (square) */
+    --ctl-gap:   clamp(10px, 1.6vw, 20px);               /* MANDATORY gap between lanes */
+    --ctl-glyph: 68%;                                    /* glyph size inside the box */
+    --edge-x:    clamp(8px, 1.8vw, 28px);                /* horizontal inset from the edge */
+    --edge-y:    clamp(6px, 1.2vh, 18px);                /* vertical inset from the edge */
+    --sa-l: env(safe-area-inset-left, 0px);
+    --sa-r: env(safe-area-inset-right, 0px);
+    --sa-t: env(safe-area-inset-top, 0px);
+    --sa-b: env(safe-area-inset-bottom, 0px);
+    --edge-l: calc(var(--edge-x) + var(--sa-l));
+    --edge-r: calc(var(--edge-x) + var(--sa-r));
+    --edge-t: calc(var(--edge-y) + var(--sa-t));
+    --edge-b: calc(var(--edge-y) + var(--sa-b));
+
     /* -- Animation timings (edit these to taste) ------------------------------
        Page turns use a smooth in/out curve (no overshoot so paper never clips
        past 180°). The COVER open uses a springy "poppy" curve with overshoot. */
@@ -159,8 +190,13 @@
      no rounded pill. Only the arrow glyph shows, same position/size, clickable. */
   /* Flip arrows OUTSIDE the book, fixed at the viewport's bottom corners. */
   .corner-arrow {
-    position: fixed; bottom: clamp(-10px, -0.5vh, -2px); z-index: 700;
-    width: clamp(84px, 10vw, 124px); height: clamp(84px, 10vw, 124px);
+    /* bottom lane. Offset is NON-NEGATIVE + safe-area aware (was a vh-tied
+       negative crop, so how much of the button hung off screen changed per
+       device). Size comes from --ctl (smaller-axis), never vw alone. */
+    position: fixed; bottom: var(--edge-b); z-index: 700;
+    width: var(--ctl); height: var(--ctl);
+    min-width: 44px; min-height: 44px;                        /* minimum touch target */
+    padding: 0;                                               /* kill the UA button padding */
     border: none; background: none; color: var(--glow);        /* neon teal — futuristic, high contrast */
     filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 9px rgba(47,230,214,0.6));  /* teal glow */
     display: none; align-items: center; justify-content: center;
@@ -187,25 +223,9 @@
     100% { opacity: 0.96; transform: scale(1); }
   }
 
-  /* HOME button — top-right margin, same visual weight as the arrows. JS toggles
-     .show (only while reading; hidden on the cover, the last page and the end). */
-  .home-btn {
-    position: fixed; top: clamp(-12px, -0.9vh, -4px); right: clamp(8px, 1.6vw, 22px); z-index: 720;
-    width: clamp(84px, 10vw, 124px); height: clamp(84px, 10vw, 124px);
-    border: none; background: none; color: var(--glow);
-    filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 9px rgba(47,230,214,0.6));
-    display: none; align-items: center; justify-content: center;
-    cursor: pointer; opacity: 0; padding: 0;
-    -webkit-user-select: none; user-select: none;
-    -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
-    transition: opacity 400ms ease, transform 150ms ease;
-  }
-  .home-btn.show   { display: flex; opacity: 0.96; }
-  .home-btn:hover  { transform: scale(1.12); }
-  .home-btn:active { transform: scale(0.9); }
-  .home-btn:focus, .home-btn:focus-visible { outline: none; box-shadow: none; }
-  .home-btn[disabled] { opacity: 0.22; pointer-events: none; }
-  .home-btn svg { width: 65%; height: 65%; }
+  /* (The HOME button was removed. Nothing occupies the TOP band now — --edge-t is
+     only used by the narrow-viewport .toolbar step below — and the right-hand lane
+     (--edge-r) belongs to the forward arrow alone.) */
 
   /* While the viewport is actively resizing / the resolution is changing, freeze
      the page-turn transitions so the book can't appear to auto-flip (JS adds
@@ -225,12 +245,14 @@
      opacity !important — `body.is-open .corner-arrow` (0,2,1) would otherwise
      out-rank this (0,2,0) rule and keep disabled arrows at full 0.96 opacity. */
   .corner-arrow[disabled] { opacity: 0.22 !important; pointer-events: none; animation: none !important; }
-  .corner-arrow.back { left: clamp(12px, 2.5vw, 34px); }
-  .corner-arrow.fwd  { right: clamp(12px, 2.5vw, 34px); }
-  /* ONE arrow asset; the glyph fills ~62% of the button box. The BACK version is
-     the same glyph mirrored on the INNER element (scaleX(-1)) so the button's own
-     hover/active scale transforms can never overwrite the mirroring. */
-  .corner-arrow svg  { width: 62%; height: 62%; }
+  .corner-arrow.back { left: var(--edge-l); }
+  .corner-arrow.fwd  { right: var(--edge-r); }   /* the one right-hand lane */
+  /* ONE arrow asset; the glyph fills --ctl-glyph of the button box. The SVG's
+     viewBox is trimmed to the ink (index.html), so the glyph is centred in the
+     box and no negative offset is needed to hide dead padding. The BACK version
+     is the same glyph mirrored on the INNER element (scaleX(-1)) so the button's
+     own hover/active scale transforms can never overwrite the mirroring. */
+  .corner-arrow svg  { width: var(--ctl-glyph); height: var(--ctl-glyph); }
   .corner-arrow.back svg { transform: scaleX(-1); }   /* mirror the forward arrow */
 
   /* ---- Page-turn hint (hand on the RIGHT side of the book) -------------------
@@ -562,7 +584,7 @@
     84%  { transform: rotateY(-180.4deg); animation-timing-function: ease-out; }  /* reaches flat + a hair over */
     100% { transform: rotateY(-180deg); }                                          /* tiny settle back (~2-3px) */
   }
-  /* HOME + REPLAY — the cover swings SHUT: the exact reverse of the opening hinge,
+  /* REPLAY — the cover swings SHUT: the exact reverse of the opening hinge,
      closing the book back to the front cover. */
   .book.closing .cover { animation: coverClose 2000ms cubic-bezier(0.5, 0, 0.25, 1) both; }
   @keyframes coverClose {
@@ -973,8 +995,9 @@
      and the same corner as the book's own forward arrow. */
   .lbd-next {
     position: absolute; z-index: 3;
-    right: clamp(14px, 2.4vw, 38px); bottom: clamp(16px, 3vh, 34px);
+    right: calc(var(--edge-r) + var(--ctl-gap)); bottom: calc(var(--edge-b) + var(--ctl-gap));
     display: none; align-items: center; gap: clamp(6px, 0.8vw, 12px);
+    min-height: 44px;                                  /* minimum touch target */
     padding: clamp(9px, 1.5vh, 15px) clamp(18px, 2.4vw, 32px);
     border: 2.5px solid #10295d; border-radius: 999px;
     font-family: var(--font-head); font-weight: 700; line-height: 1;
@@ -994,6 +1017,17 @@
     display: flex; opacity: 1; transform: scale(1);
     animation: lbdNextPop 420ms cubic-bezier(0.34, 1.45, 0.64, 1) backwards,
                lbdNextGlow 2.4s 480ms ease-in-out infinite;
+  }
+  /* PAGE-RECT game mode: the overlay is parked over the book page, so its own
+     bottom-right corner sits in the SAME viewport corner as #cornerNext (the
+     book's chrome is only hidden by body.lbd-is-fullscreen, i.e. in fullscreen).
+     Lift this button clear of the whole bottom control lane instead of stacking
+     on top of the arrow — a z-index would hide the collision, not solve it.
+     The stage's bottom edge can only be ABOVE the viewport's, so
+     `--edge-b + --ctl + 2*--ctl-gap` always clears the arrow's top edge
+     (which sits at `--edge-b + --ctl` from the viewport bottom) by >= one gap. */
+  .lbd-stage:not(.fullscreen) .lbd-next {
+    bottom: calc(var(--edge-b) + var(--ctl) + var(--ctl-gap) * 2);
   }
   .lbd-next svg { width: 1em; height: 1em; display: block; }
   .lbd-next:hover  { transform: scale(1.06); }
@@ -1019,11 +1053,10 @@
     .lbd-next.show { animation: none; }
   }
   /* While the game is full screen, get ALL the book chrome out of the way so the
-     game owns the whole screen (arrows, toolbar, Home button, page-turn hint) —
-     and block background page scrolling outright. */
+     game owns the whole screen (arrows, toolbar, page-turn hint) — and block
+     background page scrolling outright. */
   body.lbd-is-fullscreen .corner-arrow,
   body.lbd-is-fullscreen .toolbar,
-  body.lbd-is-fullscreen .home-btn,
   body.lbd-is-fullscreen .flip-hint { display: none !important; }
   body.lbd-is-fullscreen { overflow: hidden; }
 
@@ -1106,13 +1139,55 @@
 
   /* Fixed at the bottom-centre (out of the column flow) so the book can sit dead-
      centre in the viewport instead of being pushed up by this row. */
-  .toolbar { position: fixed; left: 50%; bottom: clamp(2px, 0.6vh, 8px);
+  /* NOTE: the page counter is currently not in the markup (index.html), so these
+     rules render nothing today — they are kept correct so re-adding the pill can
+     never re-introduce a collision.
+     The centre pill shares the bottom band with .corner-arrow.back (left) and
+     .corner-arrow.fwd (right), which are fixed-size and immovable. So the pill is
+     CAPPED to the room that is actually left between the two arrow lanes
+     (each lane = --ctl + --ctl-gap + its edge inset) and the pill itself may
+     shrink — it must never grow into a lane and overlap. */
+  .toolbar { position: fixed; left: 50%; bottom: var(--edge-b);
              transform: translateX(-50%); z-index: 650; margin: 0;
-             display: flex; align-items: center; gap: 14px;
+             max-width: calc(100vw - 2 * (var(--ctl) + var(--ctl-gap)
+                                          + max(var(--edge-l), var(--edge-r))));
+             display: flex; align-items: center; justify-content: center; gap: 14px;
              font-family: var(--font-head); font-weight: 500; }
-  .progress { background: rgba(255,255,255,0.82); padding: 6px 16px; border-radius: 999px;
+  .progress { background: rgba(255,255,255,0.82); padding: 6px clamp(8px, 1.4vw, 16px);
+              border-radius: 999px; overflow: hidden; text-overflow: ellipsis;
               box-shadow: 0 4px 12px rgba(0,0,0,0.1); color: var(--ink); cursor: default;
-              font-size: clamp(14px, 2vw, 18px); min-width: 108px; text-align: center; }
+              font-size: clamp(12px, 1.7vw, 18px);
+              /* min-width was a hard 108px — it could not shrink out of a lane. */
+              min-width: 0; max-width: 100%; white-space: nowrap; text-align: center; }
+
+  /* ==========================================================================
+     RESPONSIVE CONTROL STEPS  —  the chrome is driven entirely by the :root
+     tokens above, so a breakpoint only has to restate the tokens.
+     ========================================================================== */
+  /* SHORT viewports (phones in landscape, 1024x600-class netbooks): height is the
+     scarce axis, so tighten the lane and grow the glyph inside the (smaller) box
+     so the arrow still reads clearly. Note that 768/720-tall laptops are already
+     handled by the 13vh term in the base --ctl — this step is the extra squeeze
+     below that. */
+  @media (max-height: 620px) {
+    :root {
+      --ctl:       clamp(46px, min(9vw, 15vh), 84px);
+      --ctl-gap:   clamp(8px, 1.4vw, 14px);
+      --ctl-glyph: 78%;
+      --edge-y:    clamp(4px, 0.8vh, 10px);
+    }
+  }
+  /* NARROW viewports (small tablets, portrait tablets): width is the scarce axis —
+     that is where the three bottom-band elements used to collide. Shrink the lanes
+     and move the centre pill up to the (free) TOP band, beside the Home lane. */
+  @media (max-width: 820px) {
+    :root {
+      --ctl:       clamp(44px, min(11vw, 13vh), 76px);
+      --ctl-glyph: 80%;
+      --edge-x:    clamp(6px, 1.4vw, 16px);
+    }
+    .toolbar { top: var(--edge-t); bottom: auto; }
+  }
 
   /* Respect users who prefer less motion */
   @media (prefers-reduced-motion: reduce) {
