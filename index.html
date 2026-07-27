@@ -165,17 +165,9 @@
   <!-- (page counter removed) -->
 </div>
 
-<!-- HOME button — top-left, shown only while reading (hidden on the cover, the
-     last page and the end). Closes the book (reverse of the opening swing) back
-     to the front cover. -->
-<button class="home-btn" id="homeBtn" type="button" aria-label="Back to the cover">
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" fill="currentColor"/>
-  </svg>
-</button>
-
-<!-- Flip arrows OUTSIDE the book, fixed at the viewport's bottom corners
-     (bottom-left = back, bottom-right = forward). -->
+<!-- Flip arrows OUTSIDE the book, in the clear band BELOW it (left = back,
+     right = forward). CSS anchors them to the book's published bottom edge, so
+     they can never overlap it or each other at any aspect ratio. -->
 <button class="corner-arrow back" id="cornerPrev" aria-label="Previous page">
   <svg viewBox="0 0 48 48" aria-hidden="true">
     <path d="M46 19 L30 5 L30 12 C20 11 11 15 6 30 L12 33 C18 24 22 24 30 24 L30 33 Z" fill="currentColor"/>
@@ -194,10 +186,21 @@
      is warmed in the background after window load (the game is silent on boot).
      script.js reveals it over the game page's frame when the reader lands there;
      the game's own "Let's Go" tap (relayed by game/embed-bridge.js as lbd-start)
-     expands it to fullscreen, and lbd-complete returns to the book and advances. -->
+     expands it to fullscreen, and on completion the NEXT button below appears
+     over the win screen — tapping it returns to the book and turns the page. -->
 <div class="lbd-stage" id="lbdStage" aria-hidden="true">
   <iframe id="lbdFrame" title="Interactive learning game" src="about:blank"
           allow="autoplay; fullscreen" allowfullscreen></iframe>
+  <!-- End-of-game NEXT button. Hidden (and disabled) until the game reports it
+       is complete; the game never advances the book on its own — the reader taps
+       this to close the game and turn to the next story page. -->
+  <button class="lbd-next" id="lbdNextBtn" type="button" disabled aria-hidden="true"
+          aria-label="Next page">
+    <span>Next</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 11h11.2l-4.6-4.6L12 5l7 7-7 7-1.4-1.4 4.6-4.6H4z" fill="currentColor"/>
+    </svg>
+  </button>
 </div>
 
 <!-- Inlined one-shot SFX (base64) for glitch-free Web Audio playback on file:// -->

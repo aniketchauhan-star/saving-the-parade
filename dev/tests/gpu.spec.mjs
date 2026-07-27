@@ -67,6 +67,12 @@ test("page windowing active; screenshots for ghost-layer inspection", async ({ p
   await page.screenshot({ path: shot("06-lbd-fullscreen") });
   const f = page.frames().find((fr) => fr.url().includes("game/index.html"));
   await f.evaluate(() => window.completeGame());
+  // completion only arms the overlay's Next button — the tap is what turns the page
+  const lbdNext = page.locator("#lbdNextBtn");
+  await expect(lbdNext).toBeVisible({ timeout: 10000 });
+  await page.waitForTimeout(600); // pop-in animation
+  await page.screenshot({ path: shot("06b-lbd-complete-next") });
+  await lbdNext.click();
   await page.waitForFunction(() => document.querySelectorAll(".leaf.flipped").length === 4, null, { timeout: 25000 });
   await page.waitForTimeout(700);
   await page.screenshot({ path: shot("07-return-from-lbd") });
