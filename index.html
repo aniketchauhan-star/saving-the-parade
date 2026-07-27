@@ -165,24 +165,21 @@
   <!-- (page counter removed) -->
 </div>
 
-<!-- HOME button — top-left, shown only while reading (hidden on the cover, the
-     last page and the end). Closes the book (reverse of the opening swing) back
-     to the front cover. -->
-<button class="home-btn" id="homeBtn" type="button" aria-label="Back to the cover">
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" fill="currentColor"/>
-  </svg>
-</button>
+<!-- (No HOME button: the book is read forward with the corner arrows, and the
+     only way back to the front cover is Replay on THE END page.) -->
 
 <!-- Flip arrows OUTSIDE the book, fixed at the viewport's bottom corners
      (bottom-left = back, bottom-right = forward). -->
+<!-- Both arrows: viewBox TRIMMED to the glyph's ink box (x 6..46, y 5..33) so the
+     arrow is centred in its button and the CSS needs NO negative offset to hide
+     dead SVG padding (that crop was tied to vh, so it changed per device). -->
 <button class="corner-arrow back" id="cornerPrev" aria-label="Previous page">
-  <svg viewBox="0 0 48 48" aria-hidden="true">
+  <svg viewBox="6 5 40 28" aria-hidden="true">
     <path d="M46 19 L30 5 L30 12 C20 11 11 15 6 30 L12 33 C18 24 22 24 30 24 L30 33 Z" fill="currentColor"/>
   </svg>
 </button>
 <button class="corner-arrow fwd" id="cornerNext" aria-label="Next page">
-  <svg viewBox="0 0 48 48" aria-hidden="true">
+  <svg viewBox="6 5 40 28" aria-hidden="true">
     <path d="M46 19 L30 5 L30 12 C20 11 11 15 6 30 L12 33 C18 24 22 24 30 24 L30 33 Z" fill="currentColor"/>
   </svg>
 </button>

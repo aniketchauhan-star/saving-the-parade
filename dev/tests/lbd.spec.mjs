@@ -118,7 +118,7 @@ test.describe("embedded LBD", () => {
     const vp = page.viewportSize();
     expect(Math.round(stageBox.width)).toBe(vp.width);
     expect(Math.round(stageBox.height)).toBe(vp.height);
-    for (const sel of ["#cornerNext", "#cornerPrev", "#homeBtn"]) {
+    for (const sel of ["#cornerNext", "#cornerPrev"]) {
       await expect(page.locator(sel)).toBeHidden();
     }
     f = gameFrame(page);
@@ -182,7 +182,7 @@ test.describe("embedded LBD", () => {
     assertClean(errs);
   });
 
-  test("leaving before starting + Home route: overlay cleared, audio dead, revisit fresh", async ({ page }) => {
+  test("leaving before starting: overlay cleared, audio dead, revisit fresh", async ({ page }) => {
     const errs = watchErrors(page);
     await gotoReady(page);
     await waitForWarm(page);
@@ -203,17 +203,24 @@ test.describe("embedded LBD", () => {
     await page.waitForTimeout(1400);
     await expect(page.frameLocator("#lbdFrame").locator("#playButton.play-ready")).toBeVisible({ timeout: 6000 });
 
-    // HOME from the LBD page: overlay + fullscreen classes cleared, book closes.
-    await page.click("#homeBtn");
-    await page.waitForTimeout(2300); // cover-close swing
+    // (The Home button was removed, so there is no longer a mid-story route back
+    // to the cover to exercise here — Replay on THE END page is the only one, and
+    // the "full journey" test above covers leaving the game the intended way.)
+    // Leaving BACKWARDS off the game page must also tear the overlay down.
+    await page.click("#cornerPrev");
+    await page.waitForFunction(() => document.querySelectorAll(".leaf.flipped").length === 2);
+    await page.waitForTimeout(1400);
     await expect(page.locator("#lbdStage")).not.toHaveClass(/visible/);
     const state = await page.evaluate(() => ({
       fullscreenClass: document.body.classList.contains("lbd-is-fullscreen"),
-      isOpen: document.body.classList.contains("is-open"),
+      gameAudioDead: (() => {
+        const fr = document.getElementById("lbdFrame");
+        try { return !fr.contentWindow._themeAudio || fr.contentWindow._themeAudio.paused; }
+        catch (_) { return true; }
+      })(),
     }));
     expect(state.fullscreenClass).toBe(false);
-    expect(state.isOpen).toBe(false);
-    await expect(page.locator("#hint")).toBeVisible({ timeout: 5000 }); // back on the cover
+    expect(state.gameAudioDead).toBe(true);
     assertClean(errs);
   });
 });

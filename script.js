@@ -277,7 +277,6 @@ const hint       = document.getElementById("hint");
 const cornerPrev  = document.getElementById("cornerPrev");
 const cornerNext  = document.getElementById("cornerNext");
 const replayBtn   = document.getElementById("replayBtn");   // lives on the THE END page (built above)
-const homeBtn     = document.getElementById("homeBtn");
 
 /* ==========================================================================
    LBD OVERLAY  —  the PowerUp Bots game embedded as one page.
@@ -820,9 +819,6 @@ function goPrev() {
 /* ---- Nav state --------------------------------------------------------- */
 function updateNavState() {
   const last = totalPages - 1;
-  // HOME button appears as soon as the cover OPENS (not after the open finishes) —
-  // hidden on the cover and on the last page (THE END, which has its own Replay).
-  if (homeBtn) homeBtn.classList.toggle("show", opened && flipped < last);
   if (cornerPrev) {
     // On the FIRST story page the Back arrow is fully hidden (display:none via
     // .is-hidden), not merely disabled/faded.
@@ -949,15 +945,14 @@ function resetToStart() {
   bookFloat.classList.remove("rest");          // resume the idle bob
   tapCatcher.style.pointerEvents = "auto";     // Play is tappable again
   hideFlipHint(); clearTimeout(idleHintTimer); clearTimeout(nudgeHideTimer);
-  if (homeBtn) homeBtn.classList.remove("show");
   try { bgMusic.pause(); bgMusic.currentTime = 0; } catch (_) {}   // stop music; restarts on Play
   updateNavState();                            // hides the progress read-out (not opened)
 }
 
 /* ---- CLOSE THE BOOK: the cover swings SHUT — the exact REVERSE of the opening
-   hinge (cover −180 → 0) — and the book lands on the front cover. Shared by HOME
-   (while reading) and REPLAY (from THE END page). `afterReset` runs once we're
-   back on the cover. ------------------------------------------------------ */
+   hinge (cover −180 → 0) — and the book lands on the front cover. Driven by
+   REPLAY (from THE END page). `afterReset` runs once we're back on the
+   cover. ------------------------------------------------------------------ */
 function closeBookToCover(afterReset) {
   ready = false;                               // block flips during the close
   clearTimeout(_openTimer);
@@ -974,7 +969,6 @@ function closeBookToCover(afterReset) {
   clearPageGate();                             // no stale video watchdog into the cover
   hideFlipHint(); clearTimeout(idleHintTimer); clearTimeout(nudgeHideTimer);
   if (cornerNext) cornerNext.classList.remove("blink", "blink1");
-  if (homeBtn) homeBtn.classList.remove("show");
   var v = currentVideo(); if (v) { try { v.pause(); } catch (_) {} }
   // pages back UNDER the cover, so the closing cover sweeps over them
   flipbookEl.style.zIndex = "";
@@ -1001,13 +995,8 @@ function replayBook() {
   closeBookToCover();
 }
 
-/* ---- HOME: close the book (reverse of the opening swing) and land on the front
-   cover. Only available while reading. ------------------------------------ */
-function goHome() {
-  if (!opened || animating) return;
-  if (!ready) { clearTimeout(_openTimer); resetToStart(); return; }  // tapped mid-open → snap back to the cover
-  closeBookToCover();
-}
+/* (There is no HOME route any more — the Home button was removed, so Replay on
+   THE END page is the only way back to the front cover.) */
 
 /* ==========================================================================
    INPUT  —  tap PLAY to OPEN the cover; once open, drag + corner arrows +
@@ -1040,7 +1029,6 @@ hint.addEventListener("click", function (e) { e.stopPropagation(); if (!opened) 
 cornerPrev.addEventListener("click", function (e) { e.stopPropagation(); goPrev(); this.blur(); });
 cornerNext.addEventListener("click", function (e) { e.stopPropagation(); goNext(); this.blur(); });
 if (replayBtn) replayBtn.addEventListener("click", function (e) { e.stopPropagation(); replayBook(); this.blur(); });
-if (homeBtn) homeBtn.addEventListener("click", function (e) { e.stopPropagation(); goHome(); this.blur(); });
 
 // Page interaction — DRAG TO TURN: grab the page and it follows your cursor,
 // rotating about the spine, then SNAPS to the nearest state when you let go.
