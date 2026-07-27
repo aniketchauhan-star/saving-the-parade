@@ -96,7 +96,10 @@ async function settle(page, w, h) {
       try { await document.exitFullscreen(); } catch (_) {}
     }
   });
-  await page.waitForFunction(() => !document.fullscreenElement, null, { timeout: 5000 });
+  // Generous budgets: both of these are sub-second on an idle machine, but the
+  // page's own timers are starved on a loaded one — a tight timeout would turn
+  // machine load into a layout "failure".
+  await page.waitForFunction(() => !document.fullscreenElement, null, { timeout: 20000 });
   for (let attempt = 0; ; attempt++) {
     try {
       await page.setViewportSize({ width: w, height: h });
@@ -110,7 +113,7 @@ async function settle(page, w, h) {
   await page.waitForFunction(                           // body.is-resizing clears ~220ms after it settles
     () => !document.body.classList.contains("is-resizing"),
     null,
-    { timeout: 5000 }
+    { timeout: 20000 }
   );
   await page.mouse.move(Math.round(w / 2), 4);          // top-centre: no control lives there
   await page.waitForTimeout(260);                       // the 150ms transform transition unwinds
