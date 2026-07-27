@@ -43,6 +43,9 @@ test.describe("universal video gating", () => {
 
     // While the video plays, no forward route works.
     await expectNoForwardMovement(page, 0);
+    // Home remains usable during the video (visible + enabled).
+    await expect(page.locator("#homeBtn")).toBeVisible();
+    await expect(page.locator("#homeBtn")).toBeEnabled();
 
     // Completing the video (real `ended`) reveals Next (interaction half of the
     // dual gate is auto-complete: page 1 configures no required interaction).
@@ -76,7 +79,7 @@ test.describe("universal video gating", () => {
     await expect(page.locator("#cornerNext")).toBeVisible({ timeout: 10000 });
   });
 
-  test("broken video releases the gate via error/watchdog; Back stays usable", async ({ page }) => {
+  test("broken video releases the gate via error/watchdog; Back and Home stay usable", async ({ page }) => {
     const errs = watchErrors(page);
     // Deliberately break page 2's video source (controlled test).
     await page.route("**/assets/2.webm", (r) => r.abort());
@@ -85,8 +88,9 @@ test.describe("universal video gating", () => {
     await finishCurrentVideo(page);
     await nextPage(page); // arrive on the broken-video page
 
-    // Back immediately usable.
+    // Back + Home immediately usable.
     await expect(page.locator("#cornerPrev")).toBeEnabled();
+    await expect(page.locator("#homeBtn")).toBeEnabled();
 
     // The error (or watchdog) path must unlock Next without a working video.
     await expect(page.locator("#cornerNext")).toBeEnabled({ timeout: 35000 });
