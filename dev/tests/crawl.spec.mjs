@@ -52,12 +52,9 @@ test("crawl every page: no errors, media healthy, gates release, nav state corre
       await expect(page.locator("#cornerPrev")).toBeEnabled();
     }
     if (isLast) {
-      // THE END: forward arrow visible but disabled; Home hidden (Replay owns the page)
+      // THE END: forward arrow visible but permanently disabled (Replay owns the page)
       await expect(page.locator("#cornerNext")).toBeDisabled();
-      await expect(page.locator("#homeBtn")).toBeHidden();
       await expect(page.locator(".replay-btn")).toBeVisible();
-    } else {
-      await expect(page.locator("#homeBtn")).toBeVisible();
     }
 
     await page.screenshot({ path: testInfo.outputPath(`crawl-page-${idx + 1}.png`) });

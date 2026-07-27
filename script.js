@@ -219,6 +219,7 @@ function makeSpeechBubble(cfg) {
 const flipbookEl  = document.getElementById("flipbook");
 const pageStackEl = flipbookEl ? flipbookEl.querySelector(".page-stack") : null;   // right-side page stack
 const flipScaleEl = document.getElementById("flipScale");
+const stageEl     = document.querySelector(".stage");   // owns the reserved control gutter (padding)
 const coverScene  = document.getElementById("coverScene");
 // ONE full 16:9 page per view (single display). page 1 = entry 1. The themed
 // book frame forms the left spine/cover edge (always visible when open); pages
@@ -277,7 +278,6 @@ const hint       = document.getElementById("hint");
 const cornerPrev  = document.getElementById("cornerPrev");
 const cornerNext  = document.getElementById("cornerNext");
 const replayBtn   = document.getElementById("replayBtn");   // lives on the THE END page (built above)
-const homeBtn     = document.getElementById("homeBtn");
 
 /* ==========================================================================
    LBD OVERLAY  —  the PowerUp Bots game embedded as one page.
@@ -293,25 +293,30 @@ const homeBtn     = document.getElementById("homeBtn");
    • start    : the game (via embed-bridge.js) posts {source:"lbd", type:"lbd-start"}
                 on the real "Let's Go" tap → the overlay morphs from the page frame
                 to true viewport fullscreen; all flipbook chrome hides.
-   • complete : the bridge posts {source:"lbd", type:"lbd-complete"} once the win
-                celebration audio has really finished (with error/watchdog
-                fallbacks) → the overlay shrinks back into the page frame, the book
-                auto-turns to the next story page, and the iframe is torn down to
-                about:blank (killing all game audio/timers) then re-warmed from
+   • complete : the game's win screen is terminal, so completion only REVEALS the
+                overlay's own "Next" button (the raw {type:"activity_complete"} or
+                the bridge's {source:"lbd", type:"lbd-complete"}, whichever lands
+                first, after a short beat so the celebration can land). Nothing
+                moves on its own — the reader taps Next.
+   • next     : that tap shrinks the overlay back into the page frame, turns the
+                book to the next story page, and tears the iframe down to
+                about:blank (killing all game audio/timers) then re-warms it from
                 cache so a revisit starts instantly on a fresh intro.
    ========================================================================== */
 const lbdStage   = document.getElementById("lbdStage");
 const lbdFrame   = document.getElementById("lbdFrame");
+const lbdNextBtn = document.getElementById("lbdNextBtn");
 let lbdFullscreen = false;   // is the overlay expanded to full screen right now?
 let lbdStarted    = false;   // has the child tapped "Let's Go" this visit?
 let lbdWasOn      = false;   // was the overlay showing on the previous refresh?
 let lbdExiting    = false;   // guard so "complete" only advances once
 let lbdCompleted  = false;   // has the game reported complete this visit?
 let lbdWarmTimer  = null;    // pending idle-warm handle ({ric:id} or {t:id})
-// Legacy fallback: if the bridge ever fails to load, the game's own raw
-// {type:"activity_complete"} still finishes the visit after its celebration.
-const LBD_CELEBRATE_MS = 5200;
-let _lbdFallbackTimer = null;
+// Beat between "the game says it's done" and the Next button popping in: lets the
+// win screen + confetti land, and stops a stray tap from the last move landing on
+// a button that appeared under the finger.
+const LBD_NEXT_DELAY_MS = 1100;
+let _lbdNextTimer = null;    // pending Next-button reveal
 
 // Show the pre-LBD backdrop inside the frame while the game boots (and while it's
 // unloaded) so there is no dark flash — it matches the game's own start screen,
@@ -365,7 +370,7 @@ function resetLbd() {
   if (!lbdFrame) return;
   lbdStarted = false;
   lbdCompleted = false;
-  clearTimeout(_lbdFallbackTimer); _lbdFallbackTimer = null;
+  hideLbdNext();                          // a stale Next must never greet a revisit
   cancelLbdWarm();
   lbdFrame.src = "about:blank";
   lbdFrame.dataset.loaded = "";
@@ -420,11 +425,31 @@ function updateLbdOverlay() {
     }
   }
 }
-// Game complete: shrink the overlay back into the page frame, then turn to the
-// next story page automatically. Game input is ignored during the closing morph.
+/* ---- End-of-game NEXT button --------------------------------------------
+   The win screen has no exit of its own, so the overlay carries one. It is only
+   ever armed by finishLbd() (i.e. the game really reported completion) and is
+   torn down again by every route out of the page — leaving, Home, Replay. */
+function showLbdNext() {
+  if (!lbdNextBtn) return;
+  lbdNextBtn.disabled = false;                    // [disabled] keeps it display:none
+  lbdNextBtn.classList.add("show");
+  lbdNextBtn.setAttribute("aria-hidden", "false");
+  // Pull keyboard focus out of the finished game so Enter/Space works right away.
+  try { lbdNextBtn.focus({ preventScroll: true }); } catch (_) {}
+}
+function hideLbdNext() {
+  clearTimeout(_lbdNextTimer); _lbdNextTimer = null;
+  if (!lbdNextBtn) return;
+  lbdNextBtn.classList.remove("show");
+  lbdNextBtn.setAttribute("aria-hidden", "true");
+  lbdNextBtn.disabled = true;
+}
+// Next tapped: shrink the overlay back into the page frame, then turn to the next
+// story page. Game input is ignored during the closing morph.
 function exitLbd() {
   if (lbdExiting) return;
   lbdExiting = true;
+  hideLbdNext();                          // the button goes with the game
   playBgMusic();                          // bring the flipbook's background music back
   lbdStage.style.pointerEvents = "none";  // no game input while the overlay closes
   if (lbdFullscreen) {
@@ -432,23 +457,35 @@ function exitLbd() {
   }
   setTimeout(function () {
     lbdStage.style.pointerEvents = "";
-    if (flipped === LBD_INDEX) goNext();  // auto-advance; leaving the page then hides,
+    if (flipped === LBD_INDEX) goNext();  // turn the page; leaving the page then hides,
                                           // resets and re-warms the iframe + re-arms the
                                           // new page's video gate (refreshMedia)
     lbdExiting = false;
   }, 470);
 }
-// Completion is handled EXACTLY once per visit, whichever message arrives.
+// Completion is handled EXACTLY once per visit, whichever message arrives: it
+// arms the Next button (after a short beat) and nothing else — the reader decides
+// when to leave the win screen.
 function finishLbd() {
   if (lbdCompleted || lbdExiting) return;
   lbdCompleted = true;
-  clearTimeout(_lbdFallbackTimer); _lbdFallbackTimer = null;
-  exitLbd();
+  clearTimeout(_lbdNextTimer);
+  _lbdNextTimer = setTimeout(function () {
+    _lbdNextTimer = null;
+    showLbdNext();
+  }, LBD_NEXT_DELAY_MS);
+}
+if (lbdNextBtn) {
+  lbdNextBtn.addEventListener("click", function () {
+    if (lbdExiting) return;               // already on the way out
+    exitLbd();
+  });
 }
 // Listen for the game's messages. Only messages that really come from OUR iframe
 // are honoured (event.source check) and the bridge additionally stamps
-// data.source === "lbd". The raw {type:"activity_complete"} the game engine posts
-// is kept as a belt-and-braces fallback in case the bridge ever fails to load.
+// data.source === "lbd". Completion arrives twice — the engine's own raw
+// {type:"activity_complete"} first, the bridge's lbd-complete after the
+// celebration audio — and finishLbd() de-duplicates them.
 window.addEventListener("message", function (e) {
   const d = e && e.data;
   if (!d || !lbdFrame) return;
@@ -470,13 +507,11 @@ window.addEventListener("message", function (e) {
     return;
   }
   if (d.type === "activity_complete") {
-    // Raw engine message: give the bridge (which waits for the real celebration
-    // audio to end) first claim; only act if lbd-complete never arrives.
-    if (lbdCompleted || lbdExiting || _lbdFallbackTimer) return;
-    _lbdFallbackTimer = setTimeout(function () {
-      _lbdFallbackTimer = null;
-      finishLbd();
-    }, LBD_CELEBRATE_MS);
+    // Raw engine message — fires the moment the win screen appears, so this is
+    // normally what arms the Next button; the bridge's later lbd-complete (posted
+    // when the celebration audio really ends) is then a no-op. Either message on
+    // its own is enough, so a missing bridge never strands the reader.
+    finishLbd();
   }
 });
 
@@ -492,20 +527,40 @@ let _openTimer = null;   // pending "cover finished opening" timer
 let _homeTimer = null;   // pending "cover finished closing → back to the cover" timer
 
 /* ---- Responsive: scale the FIXED 1280x720 book to fit the viewport --------
-   ORIGINAL fit — 96% of width / 84% of height — so the book size and the arrows
-   (which stay at the viewport's bottom corners, via CSS) look exactly as before.
-   The ONLY addition is a safeguard on SHORT screens: never let the book grow so
-   tall that it covers the bottom controls. That safeguard changes nothing on
-   normal/large screens (there the 0.84 factor is the smaller of the two); it only
-   shrinks the book a little on small screens so the arrows + progress stay visible.
-   Only this CSS transform scale changes, so the paper curl is never distorted. */
+   The book is fitted to the STAGE'S CONTENT BOX — i.e. what is left after the CSS
+   reserves --nav-band at the bottom (and a side gutter) for the nav controls. The
+   reservation is read back as RESOLVED padding, so the real control size always
+   wins and the book shrinks to suit — never the other way round (the old hard-coded
+   CTRL = 64 was half the size of a 124px button, which is why the book sat on top
+   of the arrows).
+   We then publish the book's REAL rendered geometry on :root so the controls can
+   anchor to its edges instead of to the viewport — two independent coordinate
+   systems were exactly what let them drift into each other on non-16:9 screens.
+   Only the CSS transform scale changes, so the paper curl is never distorted. */
 function fitScale() {
-  const CTRL = 64;                                   // min top/bottom room kept for the controls
-  const availW = window.innerWidth * 0.88;           // leave breathing space on the left + right
-  const availH = Math.min(window.innerHeight * 0.80, window.innerHeight - CTRL * 2);
+  if (!stageEl) return;
+  // clientWidth/Height are LAYOUT values: immune to the .scene entrance transform,
+  // unlike a bounding rect (which would mis-measure during the 900ms sceneIn).
+  const cs = getComputedStyle(stageEl);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const padY = parseFloat(cs.paddingTop)  + parseFloat(cs.paddingBottom);
+  const availW = stageEl.clientWidth  - padX;
+  const availH = stageEl.clientHeight - padY;
+  if (!(availW > 0 && availH > 0)) return;      // portrait landscape-lock hides .scene
   const s = Math.min(availW / 1280, availH / 720);
   flipScaleEl.style.setProperty("--book-scale", s.toFixed(4));
-  // keep the page-turn hint glued to the forward arrow when the viewport changes
+  // The book's on-screen box, straight from the layer itself (so it accounts for
+  // the scale AND the --book-shift lift) → the controls sit outside it by maths,
+  // not by luck. Reading the rect also flushes the scale we just set.
+  const r = flipScaleEl.getBoundingClientRect();
+  const root = document.documentElement.style;
+  root.setProperty("--book-w",      r.width.toFixed(1)  + "px");
+  root.setProperty("--book-h",      r.height.toFixed(1) + "px");
+  root.setProperty("--book-left",   r.left.toFixed(1)   + "px");
+  root.setProperty("--book-right",  r.right.toFixed(1)  + "px");
+  root.setProperty("--book-top",    r.top.toFixed(1)    + "px");
+  root.setProperty("--book-bottom", r.bottom.toFixed(1) + "px");
+  // keep the page-turn hint glued to the book's right edge when the viewport changes
   if (flipHint && flipHint.classList.contains("show")) positionFlipHint();
 }
 
@@ -785,9 +840,6 @@ function goPrev() {
 /* ---- Nav state --------------------------------------------------------- */
 function updateNavState() {
   const last = totalPages - 1;
-  // HOME button appears as soon as the cover OPENS (not after the open finishes) —
-  // hidden on the cover and on the last page (THE END, which has its own Replay).
-  if (homeBtn) homeBtn.classList.toggle("show", opened && flipped < last);
   if (cornerPrev) {
     // On the FIRST story page the Back arrow is fully hidden (display:none via
     // .is-hidden), not merely disabled/faded.
@@ -914,15 +966,13 @@ function resetToStart() {
   bookFloat.classList.remove("rest");          // resume the idle bob
   tapCatcher.style.pointerEvents = "auto";     // Play is tappable again
   hideFlipHint(); clearTimeout(idleHintTimer); clearTimeout(nudgeHideTimer);
-  if (homeBtn) homeBtn.classList.remove("show");
   try { bgMusic.pause(); bgMusic.currentTime = 0; } catch (_) {}   // stop music; restarts on Play
   updateNavState();                            // hides the progress read-out (not opened)
 }
 
 /* ---- CLOSE THE BOOK: the cover swings SHUT — the exact REVERSE of the opening
-   hinge (cover −180 → 0) — and the book lands on the front cover. Shared by HOME
-   (while reading) and REPLAY (from THE END page). `afterReset` runs once we're
-   back on the cover. ------------------------------------------------------ */
+   hinge (cover −180 → 0) — and the book lands on the front cover. Used by REPLAY
+   (from THE END page). `afterReset` runs once we're back on the cover. ------ */
 function closeBookToCover(afterReset) {
   ready = false;                               // block flips during the close
   clearTimeout(_openTimer);
@@ -939,7 +989,6 @@ function closeBookToCover(afterReset) {
   clearPageGate();                             // no stale video watchdog into the cover
   hideFlipHint(); clearTimeout(idleHintTimer); clearTimeout(nudgeHideTimer);
   if (cornerNext) cornerNext.classList.remove("blink", "blink1");
-  if (homeBtn) homeBtn.classList.remove("show");
   var v = currentVideo(); if (v) { try { v.pause(); } catch (_) {} }
   // pages back UNDER the cover, so the closing cover sweeps over them
   flipbookEl.style.zIndex = "";
@@ -966,13 +1015,8 @@ function replayBook() {
   closeBookToCover();
 }
 
-/* ---- HOME: close the book (reverse of the opening swing) and land on the front
-   cover. Only available while reading. ------------------------------------ */
-function goHome() {
-  if (!opened || animating) return;
-  if (!ready) { clearTimeout(_openTimer); resetToStart(); return; }  // tapped mid-open → snap back to the cover
-  closeBookToCover();
-}
+/* (HOME was removed with its button — Replay above is the one route back to the
+   cover, and it uses the same closing swing.) */
 
 /* ==========================================================================
    INPUT  —  tap PLAY to OPEN the cover; once open, drag + corner arrows +
@@ -1005,7 +1049,6 @@ hint.addEventListener("click", function (e) { e.stopPropagation(); if (!opened) 
 cornerPrev.addEventListener("click", function (e) { e.stopPropagation(); goPrev(); this.blur(); });
 cornerNext.addEventListener("click", function (e) { e.stopPropagation(); goNext(); this.blur(); });
 if (replayBtn) replayBtn.addEventListener("click", function (e) { e.stopPropagation(); replayBook(); this.blur(); });
-if (homeBtn) homeBtn.addEventListener("click", function (e) { e.stopPropagation(); goHome(); this.blur(); });
 
 // Page interaction — DRAG TO TURN: grab the page and it follows your cursor,
 // rotating about the spine, then SNAPS to the nearest state when you let go.
@@ -1108,6 +1151,12 @@ if (homeBtn) homeBtn.addEventListener("click", function (e) { e.stopPropagation(
 })();
 
 window.addEventListener("keydown", function (e) {
+  // Game finished: page turns are still blocked under the fullscreen overlay, so
+  // the forward key drives the overlay's Next button instead. (Enter/Space already
+  // work — showLbdNext() focuses it.)
+  if (e.key === "ArrowRight" && lbdNextBtn && lbdNextBtn.classList.contains("show")) {
+    e.preventDefault(); lbdNextBtn.click(); return;
+  }
   if (e.key === "ArrowRight") { e.preventDefault(); opened ? goNext() : openBook(); }
   else if (e.key === "ArrowLeft") { e.preventDefault(); goPrev(); }
   else if ((e.key === " " || e.key === "Enter") && !opened) { e.preventDefault(); openBook(); }
@@ -1432,5 +1481,13 @@ function resetIdleHint() {
 
 /* ---- Boot ---------------------------------------------------------------- */
 fitScale();                              // scale the fixed 1280x720 book to fit first
+// The .scene entrance animation TRANSFORMS the whole stage, so that first call
+// measures the book mid-flight and publishes a slightly-off box. Re-publish once
+// it settles (target + name checked, so a descendant's animation can't claim it).
+if (stageEl && stageEl.parentElement) {
+  stageEl.parentElement.addEventListener("animationend", function (e) {
+    if (e.target === stageEl.parentElement && e.animationName === "sceneIn") fitScale();
+  });
+}
 renderLeaves();                          // lay out the leaves (all on page 1 to start)
 updateNavState();

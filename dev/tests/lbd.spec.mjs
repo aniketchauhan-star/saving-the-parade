@@ -86,7 +86,7 @@ test.describe("embedded LBD", () => {
     assertClean(errs);
   });
 
-  test("full journey: instant intro → Let's Go → fullscreen → complete → auto-advance → fresh revisit", async ({ page }) => {
+  test("full journey: instant intro → Let's Go → fullscreen → complete → Next tap → fresh revisit", async ({ page }) => {
     const errs = watchErrors(page);
     await gotoReady(page);
     await waitForWarm(page);
@@ -118,7 +118,7 @@ test.describe("embedded LBD", () => {
     const vp = page.viewportSize();
     expect(Math.round(stageBox.width)).toBe(vp.width);
     expect(Math.round(stageBox.height)).toBe(vp.height);
-    for (const sel of ["#cornerNext", "#cornerPrev", "#homeBtn"]) {
+    for (const sel of ["#cornerNext", "#cornerPrev"]) {
       await expect(page.locator(sel)).toBeHidden();
     }
     f = gameFrame(page);
@@ -134,11 +134,19 @@ test.describe("embedded LBD", () => {
     // 13. the game really runs its flow (screens advance; no errors while playing)
     await f.waitForFunction(() => window.state && window.state.step >= 1, null, { timeout: 20000 });
 
-    // 14-17. completion: the game's own success path fires; the bridge waits for
-    // the real celebration audio to end (error/watchdog backed) and posts
-    // lbd-complete exactly once → the book returns from fullscreen and advances
-    // to the next story page automatically.
+    // 14-17. completion: the game's own success path fires → the win screen stays
+    // up, fullscreen is HELD, and a Next button pops in over it. Nothing advances
+    // until the reader taps it; the tap then returns the book from fullscreen and
+    // turns to the next story page.
     await f.evaluate(() => window.completeGame());
+    const nextBtn = page.locator("#lbdNextBtn");
+    await expect(nextBtn).toBeVisible({ timeout: 10000 });
+    // no auto-advance: still fullscreen, still on the game page
+    await expect(page.locator("body")).toHaveClass(/lbd-is-fullscreen/);
+    expect(await flippedCount(page)).toBe(3);
+    await page.waitForTimeout(600); // let the pop-in animation settle before tapping
+    await nextBtn.click();
+    await expect(nextBtn).toBeHidden();
     await expect(page.locator("body")).not.toHaveClass(/lbd-is-fullscreen/, { timeout: 25000 });
     await page.waitForFunction(() => document.querySelectorAll(".leaf.flipped").length === 4, null, { timeout: 25000 });
     await expect(page.locator("#lbdStage")).not.toHaveClass(/visible/);
@@ -151,6 +159,11 @@ test.describe("embedded LBD", () => {
       },
       { timeout: 20000 }
     );
+    // the src attribute lands before the frame actually navigates — wait for the
+    // real frame, not just the attribute
+    await expect
+      .poll(() => page.frames().some((fr) => fr.url().includes("game/index.html")), { timeout: 20000 })
+      .toBe(true);
     const f2 = gameFrame(page);
     await f2.waitForFunction(() => document.readyState === "complete");
     const post = await f2.evaluate(() => ({
@@ -169,7 +182,7 @@ test.describe("embedded LBD", () => {
     assertClean(errs);
   });
 
-  test("leaving before starting + Home route: overlay cleared, audio dead, revisit fresh", async ({ page }) => {
+  test("leaving before starting: overlay cleared, audio dead, revisit fresh", async ({ page }) => {
     const errs = watchErrors(page);
     await gotoReady(page);
     await waitForWarm(page);
@@ -190,17 +203,12 @@ test.describe("embedded LBD", () => {
     await page.waitForTimeout(1400);
     await expect(page.frameLocator("#lbdFrame").locator("#playButton.play-ready")).toBeVisible({ timeout: 6000 });
 
-    // HOME from the LBD page: overlay + fullscreen classes cleared, book closes.
-    await page.click("#homeBtn");
-    await page.waitForTimeout(2300); // cover-close swing
+    // Leaving BACKWARD off the game page tears the overlay down just as cleanly.
+    await page.click("#cornerPrev");
+    await page.waitForFunction(() => document.querySelectorAll(".leaf.flipped").length === 2);
+    await page.waitForTimeout(1400);
     await expect(page.locator("#lbdStage")).not.toHaveClass(/visible/);
-    const state = await page.evaluate(() => ({
-      fullscreenClass: document.body.classList.contains("lbd-is-fullscreen"),
-      isOpen: document.body.classList.contains("is-open"),
-    }));
-    expect(state.fullscreenClass).toBe(false);
-    expect(state.isOpen).toBe(false);
-    await expect(page.locator("#hint")).toBeVisible({ timeout: 5000 }); // back on the cover
+    expect(await page.evaluate(() => document.body.classList.contains("lbd-is-fullscreen"))).toBe(false);
     assertClean(errs);
   });
 });
