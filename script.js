@@ -219,7 +219,6 @@ function makeSpeechBubble(cfg) {
 const flipbookEl  = document.getElementById("flipbook");
 const pageStackEl = flipbookEl ? flipbookEl.querySelector(".page-stack") : null;   // right-side page stack
 const flipScaleEl = document.getElementById("flipScale");
-const stageEl     = document.querySelector(".stage");   // owns the reserved control gutter (padding)
 const coverScene  = document.getElementById("coverScene");
 // ONE full 16:9 page per view (single display). page 1 = entry 1. The themed
 // book frame forms the left spine/cover edge (always visible when open); pages
@@ -278,6 +277,7 @@ const hint       = document.getElementById("hint");
 const cornerPrev  = document.getElementById("cornerPrev");
 const cornerNext  = document.getElementById("cornerNext");
 const replayBtn   = document.getElementById("replayBtn");   // lives on the THE END page (built above)
+const homeBtn     = document.getElementById("homeBtn");
 
 /* ==========================================================================
    LBD OVERLAY  —  the PowerUp Bots game embedded as one page.
@@ -527,40 +527,20 @@ let _openTimer = null;   // pending "cover finished opening" timer
 let _homeTimer = null;   // pending "cover finished closing → back to the cover" timer
 
 /* ---- Responsive: scale the FIXED 1280x720 book to fit the viewport --------
-   The book is fitted to the STAGE'S CONTENT BOX — i.e. what is left after the CSS
-   reserves --nav-band at the bottom (and a side gutter) for the nav controls. The
-   reservation is read back as RESOLVED padding, so the real control size always
-   wins and the book shrinks to suit — never the other way round (the old hard-coded
-   CTRL = 64 was half the size of a 124px button, which is why the book sat on top
-   of the arrows).
-   We then publish the book's REAL rendered geometry on :root so the controls can
-   anchor to its edges instead of to the viewport — two independent coordinate
-   systems were exactly what let them drift into each other on non-16:9 screens.
-   Only the CSS transform scale changes, so the paper curl is never distorted. */
+   ORIGINAL fit — 96% of width / 84% of height — so the book size and the arrows
+   (which stay at the viewport's bottom corners, via CSS) look exactly as before.
+   The ONLY addition is a safeguard on SHORT screens: never let the book grow so
+   tall that it covers the bottom controls. That safeguard changes nothing on
+   normal/large screens (there the 0.84 factor is the smaller of the two); it only
+   shrinks the book a little on small screens so the arrows + progress stay visible.
+   Only this CSS transform scale changes, so the paper curl is never distorted. */
 function fitScale() {
-  if (!stageEl) return;
-  // clientWidth/Height are LAYOUT values: immune to the .scene entrance transform,
-  // unlike a bounding rect (which would mis-measure during the 900ms sceneIn).
-  const cs = getComputedStyle(stageEl);
-  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-  const padY = parseFloat(cs.paddingTop)  + parseFloat(cs.paddingBottom);
-  const availW = stageEl.clientWidth  - padX;
-  const availH = stageEl.clientHeight - padY;
-  if (!(availW > 0 && availH > 0)) return;      // portrait landscape-lock hides .scene
+  const CTRL = 64;                                   // min top/bottom room kept for the controls
+  const availW = window.innerWidth * 0.88;           // leave breathing space on the left + right
+  const availH = Math.min(window.innerHeight * 0.80, window.innerHeight - CTRL * 2);
   const s = Math.min(availW / 1280, availH / 720);
   flipScaleEl.style.setProperty("--book-scale", s.toFixed(4));
-  // The book's on-screen box, straight from the layer itself (so it accounts for
-  // the scale AND the --book-shift lift) → the controls sit outside it by maths,
-  // not by luck. Reading the rect also flushes the scale we just set.
-  const r = flipScaleEl.getBoundingClientRect();
-  const root = document.documentElement.style;
-  root.setProperty("--book-w",      r.width.toFixed(1)  + "px");
-  root.setProperty("--book-h",      r.height.toFixed(1) + "px");
-  root.setProperty("--book-left",   r.left.toFixed(1)   + "px");
-  root.setProperty("--book-right",  r.right.toFixed(1)  + "px");
-  root.setProperty("--book-top",    r.top.toFixed(1)    + "px");
-  root.setProperty("--book-bottom", r.bottom.toFixed(1) + "px");
-  // keep the page-turn hint glued to the book's right edge when the viewport changes
+  // keep the page-turn hint glued to the forward arrow when the viewport changes
   if (flipHint && flipHint.classList.contains("show")) positionFlipHint();
 }
 
@@ -840,6 +820,9 @@ function goPrev() {
 /* ---- Nav state --------------------------------------------------------- */
 function updateNavState() {
   const last = totalPages - 1;
+  // HOME button appears as soon as the cover OPENS (not after the open finishes) —
+  // hidden on the cover and on the last page (THE END, which has its own Replay).
+  if (homeBtn) homeBtn.classList.toggle("show", opened && flipped < last);
   if (cornerPrev) {
     // On the FIRST story page the Back arrow is fully hidden (display:none via
     // .is-hidden), not merely disabled/faded.
@@ -966,13 +949,15 @@ function resetToStart() {
   bookFloat.classList.remove("rest");          // resume the idle bob
   tapCatcher.style.pointerEvents = "auto";     // Play is tappable again
   hideFlipHint(); clearTimeout(idleHintTimer); clearTimeout(nudgeHideTimer);
+  if (homeBtn) homeBtn.classList.remove("show");
   try { bgMusic.pause(); bgMusic.currentTime = 0; } catch (_) {}   // stop music; restarts on Play
   updateNavState();                            // hides the progress read-out (not opened)
 }
 
 /* ---- CLOSE THE BOOK: the cover swings SHUT — the exact REVERSE of the opening
-   hinge (cover −180 → 0) — and the book lands on the front cover. Used by REPLAY
-   (from THE END page). `afterReset` runs once we're back on the cover. ------ */
+   hinge (cover −180 → 0) — and the book lands on the front cover. Shared by HOME
+   (while reading) and REPLAY (from THE END page). `afterReset` runs once we're
+   back on the cover. ------------------------------------------------------ */
 function closeBookToCover(afterReset) {
   ready = false;                               // block flips during the close
   clearTimeout(_openTimer);
@@ -989,6 +974,7 @@ function closeBookToCover(afterReset) {
   clearPageGate();                             // no stale video watchdog into the cover
   hideFlipHint(); clearTimeout(idleHintTimer); clearTimeout(nudgeHideTimer);
   if (cornerNext) cornerNext.classList.remove("blink", "blink1");
+  if (homeBtn) homeBtn.classList.remove("show");
   var v = currentVideo(); if (v) { try { v.pause(); } catch (_) {} }
   // pages back UNDER the cover, so the closing cover sweeps over them
   flipbookEl.style.zIndex = "";
@@ -1015,8 +1001,13 @@ function replayBook() {
   closeBookToCover();
 }
 
-/* (HOME was removed with its button — Replay above is the one route back to the
-   cover, and it uses the same closing swing.) */
+/* ---- HOME: close the book (reverse of the opening swing) and land on the front
+   cover. Only available while reading. ------------------------------------ */
+function goHome() {
+  if (!opened || animating) return;
+  if (!ready) { clearTimeout(_openTimer); resetToStart(); return; }  // tapped mid-open → snap back to the cover
+  closeBookToCover();
+}
 
 /* ==========================================================================
    INPUT  —  tap PLAY to OPEN the cover; once open, drag + corner arrows +
@@ -1049,6 +1040,7 @@ hint.addEventListener("click", function (e) { e.stopPropagation(); if (!opened) 
 cornerPrev.addEventListener("click", function (e) { e.stopPropagation(); goPrev(); this.blur(); });
 cornerNext.addEventListener("click", function (e) { e.stopPropagation(); goNext(); this.blur(); });
 if (replayBtn) replayBtn.addEventListener("click", function (e) { e.stopPropagation(); replayBook(); this.blur(); });
+if (homeBtn) homeBtn.addEventListener("click", function (e) { e.stopPropagation(); goHome(); this.blur(); });
 
 // Page interaction — DRAG TO TURN: grab the page and it follows your cursor,
 // rotating about the spine, then SNAPS to the nearest state when you let go.
@@ -1481,13 +1473,5 @@ function resetIdleHint() {
 
 /* ---- Boot ---------------------------------------------------------------- */
 fitScale();                              // scale the fixed 1280x720 book to fit first
-// The .scene entrance animation TRANSFORMS the whole stage, so that first call
-// measures the book mid-flight and publishes a slightly-off box. Re-publish once
-// it settles (target + name checked, so a descendant's animation can't claim it).
-if (stageEl && stageEl.parentElement) {
-  stageEl.parentElement.addEventListener("animationend", function (e) {
-    if (e.target === stageEl.parentElement && e.animationName === "sceneIn") fitScale();
-  });
-}
 renderLeaves();                          // lay out the leaves (all on page 1 to start)
 updateNavState();

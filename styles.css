@@ -29,33 +29,6 @@
     /* The book's physical thickness (depth of the page block) */
     --thick: clamp(22px, 3.4vw, 48px);
 
-    /* -- NAVIGATION CONTROLS: one size scale, no per-button magic numbers ------
-       Every control is sized from --nav-btn and every gap/gutter is derived from
-       it, so nothing can drift out of step. vmin (NOT vw) so a 4:3 tablet doesn't
-       get an oversized button; the 64px floor keeps the touch target well past
-       the 44px minimum at every size. */
-    --nav-btn:  clamp(64px, 11vmin, 124px);
-    /* Minimum breathing space between any two controls, and between a control and
-       the book. Derived from the button, so it can never collapse to zero. */
-    --nav-gap:  calc(var(--nav-btn) * 0.35);
-    /* The strip reserved at the BOTTOM of the stage for the arrows: the button, a
-       gap on each side, and the home-indicator inset. fitScale() shrinks the BOOK
-       to fit what's left — the controls always have room, never the other way. */
-    --nav-band: calc(var(--nav-btn) + var(--nav-gap) * 2 + env(safe-area-inset-bottom, 0px));
-    /* Side gutter kept clear of the book (breathing space left + right). */
-    --nav-side: clamp(12px, 4vw, 64px);
-    /* Viewport-edge offsets for the fixed controls — always POSITIVE (nothing
-       hangs off-screen any more) and clear of notches / the home indicator. */
-    --nav-edge-l: calc(env(safe-area-inset-left, 0px)   + var(--nav-gap));
-    --nav-edge-r: calc(env(safe-area-inset-right, 0px)  + var(--nav-gap));
-    --nav-edge-b: calc(env(safe-area-inset-bottom, 0px) + var(--nav-gap));
-    /* The reserved strip is deeper at the bottom than at the top, so the book is
-       lifted by half the difference to stay optically centred in what's left. */
-    --book-shift: calc((var(--nav-band) - var(--nav-gap)) / 2);
-    /* Height unit that survives the mobile URL bar collapsing (dvh where it
-       exists, plain vh everywhere else — see the @supports just below). */
-    --vh: 100vh;
-
     /* -- Animation timings (edit these to taste) ------------------------------
        Page turns use a smooth in/out curve (no overshoot so paper never clips
        past 180°). The COVER open uses a springy "poppy" curve with overshoot. */
@@ -64,13 +37,6 @@
     --cover-ms:   1000ms;                                 /* cover-open duration */
     --cover-ease: cubic-bezier(0.34, 1.56, 0.64, 1);      /* springy overshoot   */
   }
-  /* dvh where the browser has it: the layout no longer jumps when the mobile URL
-     bar collapses (plain vh above is the fallback). */
-  @supports (height: 100dvh) { :root { --vh: 100dvh; } }
-  /* SHORT viewports (small laptop windows, landscape phones): trim the control so
-     the reserved band can't eat the page. Still ≥52px — well over the 44px
-     minimum touch target — and the band/gap/shift all follow it automatically. */
-  @media (max-height: 620px) { :root { --nav-btn: clamp(52px, 9vmin, 88px); } }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -125,14 +91,6 @@
   .stage {
     position: relative; flex: 1 1 auto; width: 100%; min-height: 0;
     display: flex; align-items: center; justify-content: center;
-    /* THE GUTTER, expressed as real layout. The bottom strip belongs to the nav
-       arrows and the book may never grow into it; fitScale() measures this padding
-       back in resolved px, so the stylesheet stays the single source of truth for
-       the control size (no CTRL constant to fall out of sync). */
-    padding-top: var(--nav-gap);
-    padding-bottom: var(--nav-band);
-    padding-left:  max(var(--nav-side), var(--nav-edge-l));
-    padding-right: max(var(--nav-side), var(--nav-edge-r));
   }
 
   /* The book has a FIXED internal 16:9 size (1280×720) so turn.js's flip maths
@@ -144,10 +102,7 @@
   .flip-scale {
     position: absolute; top: 50%; left: 50%;
     width: 1280px; height: 720px;
-    /* --book-shift lifts the book by half the top/bottom gutter difference, so it
-       sits optically centred in the space LEFT OVER by the arrow band (top:50% is
-       measured against the stage's padding box, which the padding doesn't move). */
-    transform: translate(-50%, calc(-50% - var(--book-shift, 0px))) scale(var(--book-scale, 0.5));
+    transform: translate(-50%, -50%) scale(var(--book-scale, 0.5));
     transform-origin: center center;
     perspective: 2400px;                         /* depth for the 3D book */
     --pw: 1280px; --ph: 720px; --thick: 42px;   /* fixed page-block dimensions */
@@ -196,24 +151,16 @@
   }
   body.is-open .book-frame { opacity: 1; }
 
-  /* Flip arrows OUTSIDE the book, in the reserved band BELOW it (left = back,
-     right = forward). position:fixed so they escape the scaled/transformed book
-     layer and never cover the pages or their corners (which keeps turn.js's hover
-     page-curl working on every corner).
-     Bare arrow icons — NO circle: no background fill, no box-shadow, no border,
-     no rounded pill. Only the arrow glyph shows, clickable.
-     VERTICAL: anchored to the BOOK, not the viewport — one gap below the book's
-     real rendered bottom edge (--book-bottom, published by fitScale()), so the two
-     coordinate systems can no longer drift into each other on any aspect ratio.
-     The min() is the anti-clipping guard: never past the safe bottom edge, even if
-     the book geometry is ever stale. fitScale() reserves --nav-band, so the first
-     term always wins and both agree.
-     HORIZONTAL: the outer corners, at a positive, notch-aware offset. */
+  /* Flip arrows OUTSIDE the book, fixed at the viewport's bottom corners
+     (bottom-left = back, bottom-right = forward). position:fixed so they escape
+     the scaled/transformed book layer and never cover the pages or their
+     corners (which keeps turn.js's hover page-curl working on every corner). */
+  /* Bare arrow icons — NO circle: no background fill, no box-shadow, no border,
+     no rounded pill. Only the arrow glyph shows, same position/size, clickable. */
+  /* Flip arrows OUTSIDE the book, fixed at the viewport's bottom corners. */
   .corner-arrow {
-    position: fixed; z-index: 700;
-    top: min(calc(var(--book-bottom, 62%) + var(--nav-gap)),
-             calc(var(--vh) - var(--nav-btn) - var(--nav-edge-b)));
-    width: var(--nav-btn); height: var(--nav-btn);
+    position: fixed; bottom: clamp(-10px, -0.5vh, -2px); z-index: 700;
+    width: clamp(84px, 10vw, 124px); height: clamp(84px, 10vw, 124px);
     border: none; background: none; color: var(--glow);        /* neon teal — futuristic, high contrast */
     filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 9px rgba(47,230,214,0.6));  /* teal glow */
     display: none; align-items: center; justify-content: center;
@@ -240,8 +187,25 @@
     100% { opacity: 0.96; transform: scale(1); }
   }
 
-  /* (The HOME button was removed — the two corner arrows are the whole nav set, so
-     no two controls share an edge and there is nothing left to collide with.) */
+  /* HOME button — top-right margin, same visual weight as the arrows. JS toggles
+     .show (only while reading; hidden on the cover, the last page and the end). */
+  .home-btn {
+    position: fixed; top: clamp(-12px, -0.9vh, -4px); right: clamp(8px, 1.6vw, 22px); z-index: 720;
+    width: clamp(84px, 10vw, 124px); height: clamp(84px, 10vw, 124px);
+    border: none; background: none; color: var(--glow);
+    filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 9px rgba(47,230,214,0.6));
+    display: none; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; padding: 0;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+    transition: opacity 400ms ease, transform 150ms ease;
+  }
+  .home-btn.show   { display: flex; opacity: 0.96; }
+  .home-btn:hover  { transform: scale(1.12); }
+  .home-btn:active { transform: scale(0.9); }
+  .home-btn:focus, .home-btn:focus-visible { outline: none; box-shadow: none; }
+  .home-btn[disabled] { opacity: 0.22; pointer-events: none; }
+  .home-btn svg { width: 65%; height: 65%; }
 
   /* While the viewport is actively resizing / the resolution is changing, freeze
      the page-turn transitions so the book can't appear to auto-flip (JS adds
@@ -261,9 +225,8 @@
      opacity !important — `body.is-open .corner-arrow` (0,2,1) would otherwise
      out-rank this (0,2,0) rule and keep disabled arrows at full 0.96 opacity. */
   .corner-arrow[disabled] { opacity: 0.22 !important; pointer-events: none; animation: none !important; }
-  /* Outer corners, positive + safe-area-aware offsets (nothing hangs off-screen). */
-  .corner-arrow.back { left:  var(--nav-edge-l); }
-  .corner-arrow.fwd  { right: var(--nav-edge-r); }
+  .corner-arrow.back { left: clamp(12px, 2.5vw, 34px); }
+  .corner-arrow.fwd  { right: clamp(12px, 2.5vw, 34px); }
   /* ONE arrow asset; the glyph fills ~62% of the button box. The BACK version is
      the same glyph mirrored on the INNER element (scaleX(-1)) so the button's own
      hover/active scale transforms can never overwrite the mirroring. */
@@ -357,6 +320,9 @@
   .replay-btn:active { transform: scale(0.96); }
   .replay-btn:focus, .replay-btn:focus-visible { outline: none; }
   .replay-btn svg { width: clamp(26px, 2.6vw, 34px); height: clamp(26px, 2.6vw, 34px); fill: #3a2408; }
+
+  /* The old fixed side-arrows are replaced by the corner arrows above. */
+  .arrow { display: none !important; }
 
   /* Soft drop shadow on the "floor" beneath the book — grows as it opens */
   .floor-shadow {
@@ -1053,10 +1019,11 @@
     .lbd-next.show { animation: none; }
   }
   /* While the game is full screen, get ALL the book chrome out of the way so the
-     game owns the whole screen (arrows, toolbar, page-turn hint) — and block
-     background page scrolling outright. */
+     game owns the whole screen (arrows, toolbar, Home button, page-turn hint) —
+     and block background page scrolling outright. */
   body.lbd-is-fullscreen .corner-arrow,
   body.lbd-is-fullscreen .toolbar,
+  body.lbd-is-fullscreen .home-btn,
   body.lbd-is-fullscreen .flip-hint { display: none !important; }
   body.lbd-is-fullscreen { overflow: hidden; }
 

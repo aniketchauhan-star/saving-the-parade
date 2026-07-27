@@ -118,7 +118,7 @@ test.describe("embedded LBD", () => {
     const vp = page.viewportSize();
     expect(Math.round(stageBox.width)).toBe(vp.width);
     expect(Math.round(stageBox.height)).toBe(vp.height);
-    for (const sel of ["#cornerNext", "#cornerPrev"]) {
+    for (const sel of ["#cornerNext", "#cornerPrev", "#homeBtn"]) {
       await expect(page.locator(sel)).toBeHidden();
     }
     f = gameFrame(page);
@@ -182,7 +182,7 @@ test.describe("embedded LBD", () => {
     assertClean(errs);
   });
 
-  test("leaving before starting: overlay cleared, audio dead, revisit fresh", async ({ page }) => {
+  test("leaving before starting + Home route: overlay cleared, audio dead, revisit fresh", async ({ page }) => {
     const errs = watchErrors(page);
     await gotoReady(page);
     await waitForWarm(page);
@@ -203,12 +203,17 @@ test.describe("embedded LBD", () => {
     await page.waitForTimeout(1400);
     await expect(page.frameLocator("#lbdFrame").locator("#playButton.play-ready")).toBeVisible({ timeout: 6000 });
 
-    // Leaving BACKWARD off the game page tears the overlay down just as cleanly.
-    await page.click("#cornerPrev");
-    await page.waitForFunction(() => document.querySelectorAll(".leaf.flipped").length === 2);
-    await page.waitForTimeout(1400);
+    // HOME from the LBD page: overlay + fullscreen classes cleared, book closes.
+    await page.click("#homeBtn");
+    await page.waitForTimeout(2300); // cover-close swing
     await expect(page.locator("#lbdStage")).not.toHaveClass(/visible/);
-    expect(await page.evaluate(() => document.body.classList.contains("lbd-is-fullscreen"))).toBe(false);
+    const state = await page.evaluate(() => ({
+      fullscreenClass: document.body.classList.contains("lbd-is-fullscreen"),
+      isOpen: document.body.classList.contains("is-open"),
+    }));
+    expect(state.fullscreenClass).toBe(false);
+    expect(state.isOpen).toBe(false);
+    await expect(page.locator("#hint")).toBeVisible({ timeout: 5000 }); // back on the cover
     assertClean(errs);
   });
 });
