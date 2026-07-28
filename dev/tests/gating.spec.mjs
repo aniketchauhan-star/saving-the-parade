@@ -57,23 +57,70 @@ test.describe("universal video gating", () => {
     assertClean(errs);
   });
 
-  test("gate re-arms on revisit (backwards then forwards)", async ({ page }) => {
+  test("a cleared page stays cleared on revisit (no second viewing)", async ({ page }) => {
     await gotoReady(page);
     await openBook(page);
     await finishCurrentVideo(page);
-    await nextPage(page); // now on page 2 (gated again)
+    await nextPage(page); // now on page 2 (gated: not seen yet)
     await expect(page.locator("#cornerNext")).toBeDisabled();
     await finishCurrentVideo(page);
     await expect(page.locator("#cornerNext")).toBeEnabled({ timeout: 10000 });
 
-    // go BACK to page 1 → its dual gate must re-arm (Next hidden again)…
+    // go BACK to page 1 → already watched, so Next is there IMMEDIATELY (the
+    // reader must never have to sit through the clip a second time).
     await page.click("#cornerPrev");
     await page.waitForFunction(() => document.querySelectorAll(".leaf.flipped").length === 0);
     await page.waitForTimeout(1400);
-    await expect(page.locator("#cornerNext")).toBeHidden();
-    // …and re-release after the replayed video ends.
+    await expect(page.locator("#cornerNext")).toBeVisible();
+    await expect(page.locator("#cornerNext")).toBeEnabled();
+
+    // forward again → page 2 is also still cleared, and Back is available there.
+    await nextPage(page);
+    await expect(page.locator("#cornerNext")).toBeVisible();
+    await expect(page.locator("#cornerNext")).toBeEnabled();
+    await expect(page.locator("#cornerPrev")).toBeVisible();
+    await expect(page.locator("#cornerPrev")).toBeEnabled();
+  });
+
+  test("the revealed Next arrow glow-pulses once, then returns to normal", async ({ page }) => {
+    await gotoReady(page);
+    await openBook(page);
+
+    const probe = () =>
+      page.locator("#cornerNext").evaluate((el) => {
+        const cs = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        return {
+          pulsing: el.classList.contains("glow-pulse"),
+          anim: cs.animationName,
+          shadows: (cs.filter.match(/drop-shadow/g) || []).length,
+          box: [Math.round(r.width), Math.round(r.height)],
+        };
+      });
+
     await finishCurrentVideo(page);
     await expect(page.locator("#cornerNext")).toBeVisible({ timeout: 10000 });
+
+    // The cue must really be RUNNING, not just class-toggled: the .is-visible
+    // reveal rule also owns `animation`, so an under-specific pulse rule would be
+    // silently dropped by the cascade and nothing would ever animate.
+    await page.waitForTimeout(500); // past the 400ms reveal, into the first pulse
+    const during = await probe();
+    expect(during.pulsing).toBe(true);
+    expect(during.anim, "the glow pulse must win the cascade").toContain("arrowGlowPulse");
+    expect(during.shadows, "the halo blooms with extra drop-shadows").toBeGreaterThan(2);
+
+    // Purely a paint effect: pulsing must never resize the fixed corner control.
+    await page.waitForTimeout(330); // opposite phase of the 660ms cycle
+    expect((await probe()).box).toEqual(during.box);
+
+    // …and it ends by itself, leaving the arrow in its normal state.
+    await page.waitForTimeout(1700);
+    const after = await probe();
+    expect(after.pulsing).toBe(false);
+    expect(after.anim).not.toContain("arrowGlowPulse");
+    expect(after.shadows).toBe(2);
+    await expect(page.locator("#cornerNext")).toBeEnabled();
   });
 
   test("broken video releases the gate via error/watchdog; Back stays usable", async ({ page }) => {

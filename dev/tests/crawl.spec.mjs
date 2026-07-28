@@ -7,6 +7,7 @@ import {
   flippedCount,
   finishCurrentVideo,
   nextPage,
+  completeLbdAndAdvance,
 } from "./helpers.mjs";
 
 /* Full flipbook crawl: every page, forward then back, with per-page checks. */
@@ -62,6 +63,18 @@ test("crawl every page: no errors, media healthy, gates release, nav state corre
     await page.screenshot({ path: testInfo.outputPath(`crawl-page-${idx + 1}.png`) });
 
     if (isLast) break;
+
+    // The GAME page: the Next arrow never appears — completing the game is the
+    // only route on, and it hands over to the overlay's own Next button.
+    const onGame = await page
+      .locator("#lbdStage")
+      .evaluate((el) => el.classList.contains("visible"));
+    if (onGame) {
+      await expect(page.locator("#cornerNext")).toBeHidden();
+      await expect(page.locator("#cornerNext")).toBeDisabled();
+      await completeLbdAndAdvance(page);
+      continue;
+    }
 
     // Move forward: on video pages the Next arrow is fully HIDDEN until the
     // clip's real `ended` event unlocks the gate; then it pops in enabled.

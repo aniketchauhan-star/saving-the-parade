@@ -182,31 +182,46 @@ test.describe("embedded LBD", () => {
     assertClean(errs);
   });
 
-  test("leaving before starting: overlay cleared, audio dead, revisit fresh", async ({ page }) => {
+  test("the game page cannot be skipped; leaving backwards clears the overlay", async ({ page }) => {
     const errs = watchErrors(page);
     await gotoReady(page);
     await waitForWarm(page);
     await openBook(page);
     await goToLbdPage(page);
 
-    // Leave FORWARD without starting the game.
-    await expect(page.locator("#cornerNext")).toBeEnabled();
-    await nextPage(page);
+    // The game IS the gate: without completing it the forward arrow is not even
+    // shown, and no forward route may leave the page.
+    await expect(page.locator("#cornerNext")).toBeHidden();
+    const art = await page.locator(".flip-scale").boundingBox();
+    await page.keyboard.press("ArrowRight");
+    await page.mouse.move(art.x + art.width - 30, art.y + art.height - 40);
+    await page.mouse.down();
+    await page.mouse.move(art.x + 40, art.y + art.height / 2, { steps: 12 });
+    await page.mouse.up();
+    await page.waitForTimeout(1400);
+    expect(await flippedCount(page), "the game page must not be skippable").toBe(3);
+
+    // (The Home button was removed, so there is no longer a mid-story route back
+    // to the cover to exercise here — Replay on THE END page is the only one, and
+    // the "full journey" test above covers leaving the game the intended way.)
+    // Leaving BACKWARDS is always allowed and must tear the overlay down.
+    await expect(page.locator("#cornerPrev")).toBeEnabled();
+    await page.click("#cornerPrev");
+    await page.waitForFunction(() => document.querySelectorAll(".leaf.flipped").length === 2);
+    await page.waitForTimeout(1400);
     await expect(page.locator("#lbdStage")).not.toHaveClass(/visible/);
     // iframe reset then silently re-warmed for an instant fresh revisit
     await page.waitForFunction(
       () => (document.getElementById("lbdFrame").getAttribute("src") || "").includes("game/index.html"),
       { timeout: 20000 }
     );
-    await page.click("#cornerPrev");
-    await page.waitForFunction(() => document.querySelectorAll(".leaf.flipped").length === 3);
-    await page.waitForTimeout(1400);
+    // page 3 was already watched, so its Next is right there — back into the game
+    // page, where the intro is fresh and instant and the gate is armed again.
+    await nextPage(page);
     await expect(page.frameLocator("#lbdFrame").locator("#playButton.play-ready")).toBeVisible({ timeout: 6000 });
+    await expect(page.locator("#cornerNext")).toBeHidden();
 
-    // (The Home button was removed, so there is no longer a mid-story route back
-    // to the cover to exercise here — Replay on THE END page is the only one, and
-    // the "full journey" test above covers leaving the game the intended way.)
-    // Leaving BACKWARDS off the game page must also tear the overlay down.
+    // …and back off it again, to check the teardown from a revisit too.
     await page.click("#cornerPrev");
     await page.waitForFunction(() => document.querySelectorAll(".leaf.flipped").length === 2);
     await page.waitForTimeout(1400);

@@ -140,3 +140,17 @@ The flipbook shell's initial readiness is *better* than baseline (576 ms vs 661 
 - Ogg/Opus + WebM target evergreen browsers (Chrome/Edge/Firefox/recent Safari). Very old Safari (<16) falls back to MP4 only for the Ira clips; story videos are WebM-only by design (per project format policy).
 - The Playwright "complete flow" test drives the game's real intro + running state via UI, then invokes the game's own `completeGame()` to reach the terminal state deterministically (playing all six laser rounds by simulated pointer input is not stable in CI time budgets). The completion *plumbing* (celebration audio wait → `lbd-complete` → shrink → auto-advance → teardown → re-warm) is exercised for real.
 - `sfx/*.mp3` retained (Safari Web Audio), documented in §13.
+
+---
+
+## 23. Update — 2026-07-28: navigation-gate revisions
+
+Three behaviour changes to the forward gate. The sections above describe the state as of 2026-07-25 and are superseded where they conflict.
+
+- **A cleared page stays cleared** (`gateCleared` in `script.js`). A page's gate arms on its FIRST arrival only; once satisfied it is remembered for the rest of the read, so going back and forward again shows Back **and** Next immediately — no second viewing. The clip still replays on a revisit; watching it out is simply no longer a condition of moving on. Replay (back to the cover) wipes the record, so a fresh read gates again from page 1. (Supersedes "gate re-arms per arrival" in §10, §18 and the §19 Gating row.)
+- **The game page is gated** (`armPageGate` type `"lbd"` + `finishLbd`). The corner Next arrow is hidden and every forward route (arrow, keyboard, swipe, corner drag) is shut until the game reports completion, which is what arms the overlay's own Next button. Back stays available throughout. Escape hatch: if the embedded game never even posts `lbd-ready`, its gate releases after 25 s (`GATE_LBD_STUCK_MS`) so a failed iframe cannot trap the reader — a game that *does* boot is never skippable. (Supersedes "the LBD page is ungated".)
+- **Glow-pulse reveal** (`.glow-pulse` / `@keyframes arrowGlowPulse`). When a gate opens and the Next arrow appears, it pops in and then pulses a brightening teal halo three times (~2 s) before settling into its normal state. Fired from `openPageGate`, so it also plays on the error/watchdog reveal route, and at most once per arrival. Glow and opacity only — deliberately **no** transform, since the arrow's measured box must stay exactly `--ctl` and inside the viewport (`controls.spec.mjs`).
+
+This also fixed a **pre-existing cascade bug**: `.corner-arrow.blink` / `.blink1` were out-ranked by `body.is-open .corner-arrow.fwd.is-visible:not([disabled])`, which owns `animation` — so neither the video-end cue nor the idle-nudge blink ever played. Both cue rules now repeat that full scope. `.blink1` was retired in favour of the glow pulse.
+
+Tests: 18/18 green (`gating` now 4, with a pulse test that asserts the animation really runs, does not resize the button, and ends by itself; `crawl` + `controls` complete the game to cross its page via the new `completeLbdAndAdvance` helper; the LBD "leave before starting" case became "the game page cannot be skipped").

@@ -285,7 +285,17 @@ test.describe("navigation controls", () => {
       await finishCurrentVideo(page);
       await nextPage(page); // -> page 3, then the LBD page
     }
-    await nextPage(page); // LBD page is ungated -> page 5 (video)
+    // The LBD page is GATED by the game: the only way on is completing it, which
+    // arms the overlay's own Next button. -> page 5 (video)
+    const lbdFrame = await gameFrame(page);
+    await lbdFrame.evaluate(() => parent.postMessage({ source: "lbd", type: "lbd-complete" }, "*"));
+    await expect(page.locator("#lbdNextBtn")).toBeVisible({ timeout: 15000 }); // 1100ms arm delay
+    await page.waitForTimeout(600);                                            // pop-in settles
+    await page.click("#lbdNextBtn");
+    await page.waitForFunction(() => document.querySelectorAll(".leaf.flipped").length === 4, null, {
+      timeout: 25000,
+    });
+    await page.waitForTimeout(1400);
     await finishCurrentVideo(page);
     await nextPage(page); // -> THE END
     const end = await page.locator("#cornerNext").evaluate((el) => ({
