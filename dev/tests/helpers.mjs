@@ -115,6 +115,33 @@ export async function completeVideoPageAndAdvance(page) {
   await nextPage(page);
 }
 
+/* The game page is gated by the game itself — the forward arrow never appears
+   there. Drive the game to completion (the bridge's completion message is exactly
+   what a real win posts), then leave through the overlay's own Next button. */
+export async function completeLbdAndAdvance(page) {
+  const before = await flippedCount(page);
+  await page.waitForFunction(
+    () => (document.getElementById("lbdFrame").getAttribute("src") || "").includes("game/index.html"),
+    null,
+    { timeout: 30000 }
+  );
+  await expect
+    .poll(() => page.frames().some((fr) => fr.url().includes("game/index.html")), { timeout: 30000 })
+    .toBe(true);
+  const f = page.frames().find((fr) => fr.url().includes("game/index.html"));
+  await f.waitForFunction(() => document.readyState === "complete");
+  await f.evaluate(() => parent.postMessage({ source: "lbd", type: "lbd-complete" }, "*"));
+  await expect(page.locator("#lbdNextBtn")).toBeVisible({ timeout: 15000 }); // 1100ms arm delay
+  await page.waitForTimeout(600);                                            // pop-in settles
+  await page.click("#lbdNextBtn");
+  await page.waitForFunction(
+    (n) => document.querySelectorAll(".leaf.flipped").length === n + 1,
+    before,
+    { timeout: 25000 }
+  );
+  await page.waitForTimeout(1400); // flip transition + settle callbacks
+}
+
 /* Walk forward from page 0 to the LBD page (index 3). */
 export async function goToLbdPage(page) {
   for (let i = 0; i < 3; i++) await completeVideoPageAndAdvance(page);

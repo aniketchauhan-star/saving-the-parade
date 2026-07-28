@@ -282,19 +282,56 @@
     72%  { transform: translateX(-34px) rotate(-6deg) scale(0.92); }
     100% { transform: translateX(18px)  rotate(9deg)  scale(1);    }
   }
-  /* The RIGHT (forward) arrow blinks while the nudge is playing, to draw the eye. */
-  .corner-arrow.blink { animation: arrowBlink 0.6s ease-in-out infinite; }
+  /* The RIGHT (forward) arrow blinks while the nudge is playing, to draw the eye.
+     Scoped like the .is-visible reveal rule (+ .blink) so it can actually WIN the
+     cascade: that rule owns `animation`, so a bare `.corner-arrow.blink` would be
+     silently ignored on the only arrow that ever gets this class. */
+  body.is-open .corner-arrow.fwd.is-visible.blink:not([disabled]) {
+    animation: arrowBlink 0.6s ease-in-out infinite;
+  }
   @keyframes arrowBlink { 0%, 100% { opacity: 0.96; } 50% { opacity: 0.2; } }
-  /* One-shot 2s blink + GOLD GLOW played ONCE when a page's video fully ends
-     (a "turn the page" cue). Pulses opacity AND a gold glow around the arrow. */
-  .corner-arrow.blink1 { animation: arrowBlink1 2s ease-in-out 1; }
-  @keyframes arrowBlink1 {
-    0%, 100% { opacity: 0.95; filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 6px  rgba(47,230,214,0.6)); }
-    25%, 75% { opacity: 0.3;  filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 3px  rgba(47,230,214,0.3)); }
-    50%      { opacity: 1;    filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 20px rgba(47,230,214,1)); }
+
+  /* ---- GLOW PULSE: the "you may turn the page now" cue ----------------------
+     Played ONCE, the moment the page's gate opens (its video ended / the game was
+     completed) and the arrow appears. It pops in and then swells three times with a
+     brightening teal halo — the arrow stays fully legible throughout (this pulses
+     the GLOW, it does not blink the arrow away) — and then settles back to normal:
+     no `forwards` fill, and JS drops .glow-pulse when it's done.
+     The selector deliberately mirrors the .is-visible reveal rule above with one
+     extra class, so it OUT-RANKS it (that rule also owns `animation`, and a lower
+     specificity here would simply be ignored) and can re-declare the reveal as the
+     first item of its own animation list — the pop plays, then the pulses. */
+  body.is-open .corner-arrow.fwd.is-visible.glow-pulse:not([disabled]) {
+    animation: arrowReveal 400ms cubic-bezier(0.34, 1.4, 0.64, 1) backwards,
+               arrowGlowPulse 660ms ease-in-out 400ms 3;
+  }
+  /* GLOW ONLY — deliberately no transform: the arrow is a fixed corner control
+     whose measured box must stay exactly --ctl and stay inside the viewport (see
+     dev/tests/controls.spec.mjs). `filter` and `opacity` paint outside the box
+     without resizing it, so the halo can bloom well past the glyph safely. */
+  @keyframes arrowGlowPulse {
+    0%, 100% {
+      opacity: 0.96;
+      filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55))
+              drop-shadow(0 0 7px rgba(47,230,214,0.45));
+    }
+    50% {
+      opacity: 1;
+      filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55))
+              drop-shadow(0 0 14px rgba(234,255,251,0.9))
+              drop-shadow(0 0 26px rgba(47,230,214,1))
+              drop-shadow(0 0 48px rgba(47,230,214,0.8))
+              drop-shadow(0 0 72px rgba(138,92,255,0.5));
+    }
   }
   @media (prefers-reduced-motion: reduce) {
-    .flip-hint.show, .corner-arrow.blink, .corner-arrow.blink1 { animation: none; }
+    .flip-hint.show { animation: none; }
+    /* No blinking, and no repeated pulsing — the one-shot reveal pop is all that
+       plays. Both rules must repeat the full scope to beat the ones above. */
+    body.is-open .corner-arrow.fwd.is-visible.blink:not([disabled]),
+    body.is-open .corner-arrow.fwd.is-visible.glow-pulse:not([disabled]) {
+      animation: arrowReveal 400ms cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
+    }
   }
 
   /* ==========================================================================
