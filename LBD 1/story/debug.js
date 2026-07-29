@@ -65,7 +65,7 @@
   var handles = [];      /* floating 8-point resize grips for the selection */
   var frozen = true;     /* freeze the picked screen (cancel its auto-advance) */
 
-  var BG_IDS = { sceneBg: 1, playBg: 1, playFx: 1, completeConfetti: 1, focusDim: 1, botSpotlight: 1 };
+  var BG_IDS = { sceneBg: 1, playBg: 1, playFx: 1, completeBg: 1, completeConfetti: 1, focusDim: 1, botSpotlight: 1 };
 
   function isBackground(el) {
     if (BG_IDS[el.id]) { return true; }

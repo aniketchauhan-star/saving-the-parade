@@ -134,7 +134,7 @@
   var IMAGE_EXTRA = [
     "assets/play.webp",           // preplay button glyph (not in the game's critical list)
     "assets/Quarter.webp",
-    "assets/NextButton2.webp",
+    "assets/postLBD.webp",        // the whole end screen is this one image
     "assets/LabGate.webp",        // CSS url() on the gate halves
     "assets/HandNudge.svg",
     "assets/TryAgainButton.webp"
