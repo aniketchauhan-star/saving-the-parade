@@ -529,19 +529,46 @@ const COVER_CLOSE_MS  = 2000; // Home/Replay: cover swings shut (reverse open); 
 let _openTimer = null;   // pending "cover finished opening" timer
 let _homeTimer = null;   // pending "cover finished closing → back to the cover" timer
 
+/* A hidden probe carrying the SAME tokens as a corner-arrow lane, so the space
+   the chrome really occupies is resolved by the BROWSER (clamp / min / env all
+   applied) and styles.css stays the single source of truth. The arrows cannot be
+   measured directly here: they are display:none until body.is-open, and
+   fitScale() runs on boot, long before that — a getBoundingClientRect() on them
+   would read 0 and reserve nothing. */
+const ctlProbe = document.createElement("div");
+ctlProbe.setAttribute("aria-hidden", "true");
+ctlProbe.style.cssText =
+  "position:absolute;left:-9999px;top:0;visibility:hidden;pointer-events:none;" +
+  "width:calc(var(--edge-l) + var(--ctl) + var(--ctl-gap));" +
+  "height:calc(var(--edge-b) + var(--ctl) + var(--ctl-gap));";
+document.body.appendChild(ctlProbe);
+
 /* ---- Responsive: scale the FIXED 1280x720 book to fit the viewport --------
-   ORIGINAL fit — 96% of width / 84% of height — so the book size and the arrows
-   (which stay at the viewport's bottom corners, via CSS) look exactly as before.
-   The ONLY addition is a safeguard on SHORT screens: never let the book grow so
-   tall that it covers the bottom controls. That safeguard changes nothing on
-   normal/large screens (there the 0.84 factor is the smaller of the two); it only
-   shrinks the book a little on small screens so the arrows + progress stay visible.
+   Base fit — 88% of width / 80% of height — for breathing space at the edges.
+   On top of that the book must never OVERLAP the bottom-corner arrows. The old
+   guard reserved a hardcoded 64px per side, but --ctl grows to 112px plus its
+   --edge-b inset, so from ~1280x800 up the book's bottom corners ran straight
+   under the arrows (at 1280x800 the overlap was ~50px across and ~30px deep).
+   The reserve is now MEASURED from the probe above instead of guessed.
+   The arrows live in the bottom CORNERS, so an overlap needs the book to reach
+   them on BOTH axes — clearing EITHER one is enough. So the book may be narrow
+   enough to stay inside the lanes, OR short enough to stay above the band,
+   whichever allows the LARGER book. That keeps 1920x1080 (which already cleared
+   horizontally) at exactly its previous size instead of shrinking it needlessly.
    Only this CSS transform scale changes, so the paper curl is never distorted. */
 function fitScale() {
-  const CTRL = 64;                                   // min top/bottom room kept for the controls
-  const availW = window.innerWidth * 0.88;           // leave breathing space on the left + right
-  const availH = Math.min(window.innerHeight * 0.80, window.innerHeight - CTRL * 2);
-  const s = Math.min(availW / 1280, availH / 720);
+  const lane = ctlProbe.getBoundingClientRect();
+  const reserveX = lane.width  || 84;                // fall back to a sane band if the
+  const reserveY = lane.height || 84;                // probe is somehow unstyled
+
+  const baseS = Math.min(
+    (window.innerWidth  * 0.88) / 1280,              // breathing space, left + right
+    (window.innerHeight * 0.80) / 720
+  );
+  const clearsX = (window.innerWidth  - reserveX * 2) / 1280;   // book stays inside the lanes
+  const clearsY = (window.innerHeight - reserveY * 2) / 720;    // book stays above the band
+  const s = Math.max(0.1, Math.min(baseS, Math.max(clearsX, clearsY)));
+
   flipScaleEl.style.setProperty("--book-scale", s.toFixed(4));
   // keep the page-turn hint glued to the forward arrow when the viewport changes
   if (flipHint && flipHint.classList.contains("show")) positionFlipHint();
