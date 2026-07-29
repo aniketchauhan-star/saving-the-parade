@@ -41,16 +41,24 @@
        screen shrinks the button instead. 52px floor + the 44px min-width/height
        backstop on each button keep a real touch target at every size.
 
-       Offsets are NON-NEGATIVE (see the trimmed SVG viewBoxes in index.html:
-       the glyph artwork is cropped to its ink, so nothing has to be pulled off
-       screen to hide dead padding). Every edge inset adds the matching
+       Offsets are NON-NEGATIVE (see the SQUARED SVG viewBoxes in index.html:
+       the glyph artwork is centred in a square viewBox, so nothing has to be
+       pulled off screen to hide dead padding). Every edge inset adds the matching
        env(safe-area-inset-*) so notches / rounded corners / the iPad home
        indicator never clip a control. */
     --ctl:       clamp(52px, min(8.5vw, 13vh), 112px);   /* button box (square) */
     --ctl-gap:   clamp(10px, 1.6vw, 20px);               /* MANDATORY gap between lanes */
-    --ctl-glyph: 62%;                                    /* square icon canvas inside the square
-                                                            button box: 232/372 = 62.4%, leaving
-                                                            even ~19% margins on all four sides */
+    --ctl-glyph: 74%;                                    /* square icon canvas inside the square
+                                                            button box; even ~13% margins on all
+                                                            four sides. Raised past the original
+                                                            62% (232/372) spec on request — the
+                                                            arrows read small there. Safe to grow:
+                                                            fitScale() reserves the whole lane
+                                                            (edge + --ctl + gap), so the book
+                                                            clears the entire button box and the
+                                                            glyph inside it can never reach the
+                                                            artwork. Touch target is the button
+                                                            box, so it is unaffected. */
     --edge-x:    clamp(8px, 1.8vw, 28px);                /* horizontal inset from the edge */
     --edge-y:    clamp(6px, 1.2vh, 18px);                /* vertical inset from the edge */
     --sa-l: env(safe-area-inset-left, 0px);
@@ -1213,7 +1221,7 @@
     :root {
       --ctl:       clamp(46px, min(9vw, 15vh), 84px);
       --ctl-gap:   clamp(8px, 1.4vw, 14px);
-      --ctl-glyph: 71%;   /* same 62/68 proportional step-down as the base token */
+      --ctl-glyph: 80%;   /* tracks the base token, keeping the small-screen boost */
       --edge-y:    clamp(4px, 0.8vh, 10px);
     }
   }
@@ -1223,7 +1231,7 @@
   @media (max-width: 820px) {
     :root {
       --ctl:       clamp(44px, min(11vw, 13vh), 76px);
-      --ctl-glyph: 73%;   /* same 62/68 proportional step-down as the base token */
+      --ctl-glyph: 82%;   /* tracks the base token, keeping the small-screen boost */
       --edge-x:    clamp(6px, 1.4vw, 16px);
     }
     .toolbar { top: var(--edge-t); bottom: auto; }
