@@ -170,16 +170,21 @@
 
 <!-- Flip arrows OUTSIDE the book, fixed at the viewport's bottom corners
      (bottom-left = back, bottom-right = forward). -->
-<!-- Both arrows: viewBox TRIMMED to the glyph's ink box (x 6..46, y 5..33) so the
-     arrow is centred in its button and the CSS needs NO negative offset to hide
-     dead SVG padding (that crop was tied to vh, so it changed per device). -->
+<!-- Both arrows: the glyph's ink box is 40x28 (x 6..46, y 5..33) — WIDER than it
+     is tall. The viewBox is therefore squared off to 40x40 and centred on that ink
+     (y 19 +/- 20 => -1..39), NOT trimmed to it. A trimmed 40x28 viewBox rendered
+     into the square glyph box let preserveAspectRatio fit by width, so the arrow
+     filled the box side-to-side but left ~1.6x more room above and below than at
+     the sides. Squaring the viewBox makes the icon canvas square, so one
+     --ctl-glyph percentage yields EVEN margins on all four sides at every
+     breakpoint, and the CSS still needs no negative offset. -->
 <button class="corner-arrow back" id="cornerPrev" aria-label="Previous page">
-  <svg viewBox="6 5 40 28" aria-hidden="true">
+  <svg viewBox="6 -1 40 40" aria-hidden="true">
     <path d="M46 19 L30 5 L30 12 C20 11 11 15 6 30 L12 33 C18 24 22 24 30 24 L30 33 Z" fill="currentColor"/>
   </svg>
 </button>
 <button class="corner-arrow fwd" id="cornerNext" aria-label="Next page">
-  <svg viewBox="6 5 40 28" aria-hidden="true">
+  <svg viewBox="6 -1 40 40" aria-hidden="true">
     <path d="M46 19 L30 5 L30 12 C20 11 11 15 6 30 L12 33 C18 24 22 24 30 24 L30 33 Z" fill="currentColor"/>
   </svg>
 </button>
