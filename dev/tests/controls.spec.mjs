@@ -44,9 +44,9 @@ const MIN_TAP = 44;     // minimum touch target, per WCAG 2.5.5 / platform HIG
    last in the stylesheet, so it wins when both steps match. */
 function expectedCtl(vw, vh) {
   const clamp = (lo, v, hi) => Math.min(hi, Math.max(lo, v));
-  if (vw <= 820) return clamp(44, Math.min(vw * 0.11, vh * 0.13), 76);   // @media (max-width: 820px)
-  if (vh <= 620) return clamp(46, Math.min(vw * 0.09, vh * 0.15), 84);   // @media (max-height: 620px)
-  return clamp(52, Math.min(vw * 0.085, vh * 0.13), 112);                // :root
+  if (vw <= 820) return clamp(50, Math.min(vw * 0.13, vh * 0.15), 90);   // @media (max-width: 820px)
+  if (vh <= 620) return clamp(52, Math.min(vw * 0.105, vh * 0.17), 98);  // @media (max-height: 620px)
+  return clamp(60, Math.min(vw * 0.10, vh * 0.15), 132);                 // :root
 }
 
 /* Real rect intersection. Returns the overlapping w/h, or null when the rects
