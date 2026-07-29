@@ -38,15 +38,21 @@
        is what broke 1366x768 laptops and landscape tablets — the button stayed
        at its 124px ceiling while the vertical room collapsed, so the bottom
        band ran out of space and the corners overlapped the page. Now a short
-       screen shrinks the button instead. 52px floor + the 44px min-width/height
+       screen shrinks the button instead. 60px floor + the 44px min-width/height
        backstop on each button keep a real touch target at every size.
+       The coefficients/ceilings were raised ~18% (8.5vw/13vh/112px -> 10vw/15vh/
+       132px, and the two media steps to match) because the arrows read small.
+       Safe now that fitScale() MEASURES this lane instead of assuming 64px: a
+       bigger --ctl automatically reserves more room, so the book shrinks to suit
+       (<=3%) rather than being overlapped. Keep the min(vw, vh) shape — sizing on
+       vw alone is the bug described above.
 
        Offsets are NON-NEGATIVE (see the SQUARED SVG viewBoxes in index.html:
        the glyph artwork is centred in a square viewBox, so nothing has to be
        pulled off screen to hide dead padding). Every edge inset adds the matching
        env(safe-area-inset-*) so notches / rounded corners / the iPad home
        indicator never clip a control. */
-    --ctl:       clamp(52px, min(8.5vw, 13vh), 112px);   /* button box (square) */
+    --ctl:       clamp(60px, min(10vw, 15vh), 132px);    /* button box (square) */
     --ctl-gap:   clamp(10px, 1.6vw, 20px);               /* MANDATORY gap between lanes */
     --ctl-glyph: 74%;                                    /* square icon canvas inside the square
                                                             button box; even ~13% margins on all
@@ -1219,7 +1225,7 @@
      below that. */
   @media (max-height: 620px) {
     :root {
-      --ctl:       clamp(46px, min(9vw, 15vh), 84px);
+      --ctl:       clamp(52px, min(10.5vw, 17vh), 98px);
       --ctl-gap:   clamp(8px, 1.4vw, 14px);
       --ctl-glyph: 80%;   /* tracks the base token, keeping the small-screen boost */
       --edge-y:    clamp(4px, 0.8vh, 10px);
@@ -1230,7 +1236,7 @@
      and move the centre pill up to the (free) TOP band, beside the Home lane. */
   @media (max-width: 820px) {
     :root {
-      --ctl:       clamp(44px, min(11vw, 13vh), 76px);
+      --ctl:       clamp(50px, min(13vw, 15vh), 90px);
       --ctl-glyph: 82%;   /* tracks the base token, keeping the small-screen boost */
       --edge-x:    clamp(6px, 1.4vw, 16px);
     }
