@@ -2764,6 +2764,31 @@
       height: auto;
     }
 
+    /* EMBEDDED boot screen (inside the flipbook): the standalone start screen's
+       GameStartScreen.webp is a full "Save the Parade" TITLE card — mid-story it
+       read as the book's welcome screen re-appearing (QA: "title screen randomly
+       appears mid-story"). Embedded, the same start-mode beat keeps its flow and
+       its "Let's Go" tap (the user gesture that unlocks audio + fullscreen) but
+       dresses as a LEVEL-TRANSITION screen: the plain lab room + a caption. */
+    #embedStartCaption {
+      position: absolute;
+      left: 50%;
+      top: 310px;                          /* sits just above the Let's Go button (top 432) */
+      transform: translateX(-50%);
+      display: none;
+      white-space: nowrap;
+      font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif;
+      font-size: 44px;
+      font-weight: 700;
+      color: #2c3e78;
+      text-shadow: 0 2px 0 rgba(255, 255, 255, .85), 0 6px 18px rgba(80, 120, 255, .35);
+      letter-spacing: 1px;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    #playStage.embed-start #embedStartCaption { display: block; }
+
     #playStage.preplay-mode #playButton {
       /* play.webp is full-bleed square art (no padding, unlike Button.webp), so
          the box IS the glyph: 110px wide, centred on the old glyph spot (804, 360). */
@@ -4260,6 +4285,9 @@
         <button id="playButton" type="button" aria-label="Let's go">
           <img id="playButtonImg" src="assets/Button.webp" alt="Play">
         </button>
+        <!-- Shown only on the EMBEDDED boot screen (.embed-start) — see the CSS
+             note at #embedStartCaption. -->
+        <div id="embedStartCaption" aria-hidden="true">Let&rsquo;s power up the bots!</div>
       </section>
 
       <div id="machineStage" class="hidden" aria-hidden="true">
@@ -5372,6 +5400,12 @@
       }
     ];
 
+    /* Running inside the flipbook's iframe? The boot screen then swaps its
+       "Save the Parade" title art for a neutral level-transition look (see
+       #embedStartCaption CSS) — standalone play is completely unchanged. */
+    var IS_EMBEDDED = false;
+    try { IS_EMBEDDED = window.parent !== window; } catch (e) { IS_EMBEDDED = true; }
+
     var FLOW = [
       { scene: "play" },
       { scene: "intro", text: "Let us charge the bots.", duration: TIMING.INTRO_SCREEN },
@@ -5819,7 +5853,7 @@
       els.iraChar.classList.remove("play-idle");
       if (els.iraChar.pause) { els.iraChar.pause(); }   /* stop the Ira clip when leaving the screen (it's a <video> now) */
       els.iraGlowRing.classList.remove("show");
-      els.playStage.classList.remove("play-exit", "start-mode", "preplay-mode");
+      els.playStage.classList.remove("play-exit", "start-mode", "preplay-mode", "embed-start");
       els.playButton.classList.remove("play-ready", "play-clicked");
       els.machineBlock.classList.remove("vibrate");
       els.machineBlock.classList.remove("rejoin-pop");
@@ -9234,7 +9268,11 @@
         state.locked = false;
         setInstruction("");
         setupBots("layout-clear");
-        els.playBg.src = ASSETS + "GameStartScreen.webp";
+        /* Embedded in the flipbook, the title-card art would duplicate the
+           book's own welcome screen mid-story — use the plain lab room + the
+           "power up the bots" caption instead. Standalone keeps the title. */
+        els.playBg.src = ASSETS + (IS_EMBEDDED ? "LetsPlayBg.webp" : "GameStartScreen.webp");
+        els.playStage.classList.toggle("embed-start", IS_EMBEDDED);
         els.playButtonImg.src = ASSETS + "Button.webp";
         els.playButtonImg.alt = "Let's Go";
         els.playButton.setAttribute("aria-label", "Let's go");
