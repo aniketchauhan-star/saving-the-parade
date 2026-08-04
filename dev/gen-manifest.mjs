@@ -40,7 +40,10 @@ entries.push(entry("assets/play-button.webp", { type: "image", stage: "shell", u
 for (let i = 1; i <= 4; i++) {
   entries.push(entry(`assets/posters/${i}.webp`, { type: "image", stage: "shell", usage: `page video poster ${i}`, order: 3 }));
 }
-entries.push(entry("game/assets/GameStartScreen.webp", { type: "image", stage: "shell", usage: "LBD page poster (leaf + overlay backdrop)", game: true, order: 4 }));
+// The LBD page poster is the game's EMBEDDED boot backdrop (plain lab room) —
+// NOT GameStartScreen.webp, whose "Save the Parade" title card duplicated the
+// book's welcome screen mid-story. Keep in sync with pages[] in script.js.
+entries.push(entry("game/assets/LetsPlayBg.webp", { type: "image", stage: "shell", usage: "LBD page poster (leaf + overlay backdrop)", game: true, order: 4 }));
 
 /* ---------- Stage B: later pages + shared audio (parent-fetched) ---------- */
 ["1", "2", "3", "4"].forEach((n, i) =>
@@ -55,7 +58,7 @@ entries.push(entry("game/index.html", { type: "document", stage: "background", u
 entries.push(entry("game/embed-bridge.js", { type: "script", stage: "background", usage: "LBD embed bridge", game: true, warmVia: "iframe", order: 41 }));
 for (const dir of ["game/assets", "game/audios"]) {
   for (const name of fs.readdirSync(path.join(ROOT, dir)).sort()) {
-    if (dir === "game/assets" && name === "GameStartScreen.webp") continue; // already a shell entry
+    if (dir === "game/assets" && name === "LetsPlayBg.webp") continue; // already a shell entry
     const rel = `${dir}/${name}`;
     const type = /\.(webm|mp4)$/i.test(name) ? "video" : /\.ogg$/i.test(name) ? "audio" : "image";
     entries.push(

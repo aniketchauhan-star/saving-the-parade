@@ -59,9 +59,10 @@ test.describe("Stage A loading", () => {
     await page.goto("/index.html", { waitUntil: "domcontentloaded" });
     await page.waitForSelector("body.boot-ready", { timeout: 45000 });
     // Queue order is ascending by real byte size: the smallest shell asset must
-    // be requested before the largest one (GameStartScreen poster ~197KB).
+    // be requested before the largest one (cover-page.webp ~102KB — the LBD
+    // poster is LetsPlayBg.webp now, no longer the biggest shell asset).
     const smallest = shellFetches.findIndex((u) => u.includes("posters/2.webp"));
-    const largest = shellFetches.findIndex((u) => u.includes("GameStartScreen"));
+    const largest = shellFetches.findIndex((u) => u.includes("cover-page"));
     expect(smallest).toBeGreaterThanOrEqual(0);
     expect(largest).toBeGreaterThanOrEqual(0);
     expect(smallest).toBeLessThan(largest);
