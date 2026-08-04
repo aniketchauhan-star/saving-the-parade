@@ -96,6 +96,16 @@
     -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
   }
 
+  /* Solid night base on the ROOT itself: any region the body gradient hasn't
+     painted yet (fullscreen enter/exit, orientation change, resize) shows this
+     instead of unrendered black. Must match the body gradient's darkest stop. */
+  html { background-color: #090626; }
+
+  /* Entering fullscreen (Play tap → requestFullscreen) makes the browser paint
+     the ::backdrop behind the root while the viewport morphs — its DEFAULT is
+     pure black, which showed as a ~1s "pitch-black flash" on tablets. Theme it. */
+  ::backdrop { background: #090626; }
+
   body {
     min-height: 100svh;
     display: flex; align-items: center; justify-content: center;
@@ -114,7 +124,11 @@
       radial-gradient(circle at 50% 106%, rgba(138,92,255,0.30) 0, transparent 55%),  /* violet glow */
       radial-gradient(circle at 12% 86%, rgba(190,70,220,0.20) 0, transparent 46%),   /* magenta haze */
       linear-gradient(165deg, #090626 0%, #130d3e 46%, #23134f 100%);
-    background-attachment: fixed;
+    /* NO background-attachment:fixed — the page never scrolls (overflow:hidden),
+       so `fixed` was visually identical but forced this whole multi-layer
+       gradient down the slow repaint path on tablets: every viewport change
+       (the fullscreen morph after Play, rotation) re-rasterised it, adding to
+       the black-flash / lag on tap. */
   }
 
   /* Whole scene fades + scales in on load (entrance animation) */
@@ -860,10 +874,28 @@
     color: #eafffb; text-shadow: 0 0 10px rgba(47, 230, 214, 0.8), 0 2px 6px rgba(0,0,0,0.6);
   }
   /* BREATHING — the button slowly grows and glows, then settles, like a calm
-     breath. transform keeps the centre placement; a soft cyan glow swells too. */
+     breath. TRANSFORM-ONLY here: the old version also animated
+     filter:drop-shadow, which re-blurs the artwork EVERY FRAME for as long as
+     the start screen is up — a constant repaint load on tablets (part of the
+     reported start-screen lag). The swelling cyan glow now lives on the
+     ::before halo below, animated with opacity + scale — compositor-only. */
   @keyframes playBreathe {
-    0%, 100% { transform: translate(-50%, -50%) scale(1);     filter: drop-shadow(0 0 8px  rgba(47,230,214,0.45)); }
-    50%      { transform: translate(-50%, -50%) scale(1.08);  filter: drop-shadow(0 0 24px rgba(47,230,214,0.85)); }
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50%      { transform: translate(-50%, -50%) scale(1.08); }
+  }
+  /* The breathing halo — its own composited layer behind the round artwork
+     (the play-button art is round with a transparent surround, so a circular
+     radial glow reads the same as the old animated drop-shadow). */
+  .play-btn::before {
+    content: ""; position: absolute; inset: -18%;
+    border-radius: 50%; z-index: -1; pointer-events: none;
+    background: radial-gradient(circle,
+      rgba(47,230,214,0.50) 0%, rgba(47,230,214,0.26) 42%, transparent 68%);
+    animation: playGlowBreathe 2.4s ease-in-out infinite;
+  }
+  @keyframes playGlowBreathe {
+    0%, 100% { opacity: 0.45; transform: scale(0.9); }
+    50%      { opacity: 1;    transform: scale(1.15); }
   }
 
   /* ==========================================================================
@@ -1069,8 +1101,20 @@
      fill would own `transform` for good and kill the hover/active scale below. */
   .lbd-next.show {
     display: flex; opacity: 1; transform: scale(1);
-    animation: lbdNextPop 420ms cubic-bezier(0.34, 1.45, 0.64, 1) backwards,
-               lbdNextGlow 2.4s 480ms ease-in-out infinite;
+    animation: lbdNextPop 420ms cubic-bezier(0.34, 1.45, 0.64, 1) backwards;
+  }
+  /* Breathing glow — an ::after layer whose OPACITY pulses (compositor-only).
+     The old version re-drew the button's box-shadow every frame (a per-frame
+     repaint for as long as the win screen was up). The button keeps its static
+     base shadow; only this brighter teal halo fades in and out on top. */
+  .lbd-next::after {
+    content: ""; position: absolute; inset: -3px;
+    border-radius: inherit; pointer-events: none;
+    box-shadow: 0 0 34px rgba(47,230,214,0.95);
+    opacity: 0;
+  }
+  .lbd-next.show::after {
+    animation: lbdNextGlow 2.4s 480ms ease-in-out infinite;
   }
   /* PAGE-RECT game mode: the overlay is parked over the book page, so its own
      bottom-right corner sits in the SAME viewport corner as #cornerNext (the
@@ -1096,15 +1140,14 @@
     70%  { opacity: 1; transform: scale(1.08) translateY(0); }
     100% { opacity: 1; transform: scale(1)    translateY(0); }
   }
-  /* Breathing glow — box-shadow only, so it never fights the hover/active scale. */
+  /* Breathing glow — opacity of the ::after halo above; never touches layout
+     or the button's own shadow, so it can't fight the hover/active scale. */
   @keyframes lbdNextGlow {
-    0%, 100% { box-shadow: 0 6px 18px rgba(12,30,70,0.35), 0 0 22px rgba(47,230,214,0.5),
-                           inset 0 2px 0 rgba(255,255,255,0.75); }
-    50%      { box-shadow: 0 6px 18px rgba(12,30,70,0.35), 0 0 34px rgba(47,230,214,0.95),
-                           inset 0 2px 0 rgba(255,255,255,0.75); }
+    0%, 100% { opacity: 0; }
+    50%      { opacity: 1; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .lbd-next.show { animation: none; }
+    .lbd-next.show, .lbd-next.show::after { animation: none; }
   }
   /* While the game is full screen, get ALL the book chrome out of the way so the
      game owns the whole screen (arrows, toolbar, page-turn hint) — and block
@@ -1245,7 +1288,8 @@
 
   /* Respect users who prefer less motion */
   @media (prefers-reduced-motion: reduce) {
-    .book-float { animation: none; } .scene { animation: none; } .play-btn { animation: none; }
+    .book-float { animation: none; } .scene { animation: none; }
+    .play-btn, .play-btn::before { animation: none; }
     .book.open .cover { animation-duration: 420ms; }
     .book.open .cover .front .curl, body.is-open .cover-cast { animation-duration: 420ms; }
     :root { --flip-ms: 260ms; --cover-ms: 340ms; }

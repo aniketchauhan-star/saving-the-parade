@@ -63,7 +63,12 @@ const pages = [
   // after window load. Landing here reveals the already-booted intro INSIDE the
   // page frame; the game's own "Let's Go" tap expands it to fullscreen, and its
   // completion turns the book to the next page automatically.
-  { type: "lbd", src: "game/index.html", poster: "game/assets/GameStartScreen.webp" },
+  // Poster = the game's EMBEDDED boot screen backdrop (LetsPlayBg.webp — the
+  // plain lab room), NOT GameStartScreen.webp: that art is a full "Save the
+  // Parade" title card, which mid-story read as the book's welcome screen
+  // re-appearing. The game (in embed mode) boots onto the same backdrop, so the
+  // leaf poster → live-iframe handoff stays seamless.
+  { type: "lbd", src: "game/index.html", poster: "game/assets/LetsPlayBg.webp" },
   { type: "video", src: "assets/4.webm" },  // 5
   { type: "end" },                          // 6 — THE END page (cream) + Replay
 ];
