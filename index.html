@@ -216,6 +216,15 @@
   </button>
 </div>
 
+<!-- Play-tap transition CURTAIN: an opaque night-sky layer raised in the same
+     user gesture as the fullscreen request. The browser's fullscreen morph and
+     the first re-raster at the new viewport size (the QA "pitch-black flash" on
+     tablets) happen entirely behind this intentionally-styled backdrop, which
+     then dissolves into the cover-opening animation. Driven by script.js
+     (showOpenCurtain / hideOpenCurtain); sits above all book & game chrome,
+     below the rotate-to-landscape notice. -->
+<div class="open-curtain" id="openCurtain" aria-hidden="true"></div>
+
 <!-- Inlined one-shot SFX (base64) for glitch-free Web Audio playback on file:// -->
 <script src="sfx-data.js"></script>
 <!-- Two-stage asset preloader (Stage A gates the Play button; Stage B warms
