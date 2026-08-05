@@ -523,6 +523,27 @@ window.addEventListener("message", function (e) {
   }
 });
 
+/* ---- Fullscreen watchdog (belt-and-suspenders for lbd-start) --------------
+   The bridge's lbd-start relay hooks the game's internals, and a missed relay
+   (stale cached bridge, an input layer it can't see) leaves the reader playing
+   the whole game trapped inside the page frame. The iframe is same-origin, so
+   the parent can check the truth directly: the game's FLOW step is 0 on the
+   armed start screen and only ever advances through its own start handler. If
+   the game is past its start screen while the overlay is still parked in the
+   page frame, engage fullscreen exactly as a real lbd-start would. */
+setInterval(function () {
+  if (LBD_INDEX < 0 || !lbdFrame || !lbdStage) return;
+  if (!opened || flipped !== LBD_INDEX || lbdFullscreen || lbdExiting) return;
+  if (!lbdStage.classList.contains("visible")) return;
+  try {
+    var w = lbdFrame.contentWindow;
+    if (w && w.state && typeof w.state.step === "number" && w.state.step >= 1) {
+      lbdStarted = true;
+      setLbdFullscreen(true);
+    }
+  } catch (_) { /* frame mid-navigation / inaccessible — try again next tick */ }
+}, 700);
+
 let opened = false;      // has the cover been opened?
 let ready  = false;      // has the cover FINISHED opening? (flips allowed only then)
 let flipped = 0;         // how many leaves are currently turned to the left
@@ -949,12 +970,29 @@ function updateNavState() {
    cover (Home / Replay). Applies on every screen; silently no-ops where the
    browser blocks it (e.g. iPhone Safari can't fullscreen arbitrary elements). */
 function enterFullscreen() {
+  // Resolves TRUE only when a fullscreen morph actually started (the viewport
+  // is about to resize); FALSE when fullscreen is unavailable, already active,
+  // or the request was rejected — so the caller knows whether to wait it out.
   try {
-    if (document.fullscreenElement || document.webkitFullscreenElement) return;
+    if (document.fullscreenElement || document.webkitFullscreenElement) return Promise.resolve(false);
     var el = document.documentElement;
     var req = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen || el.msRequestFullscreen;
-    if (req) { var p = req.call(el); if (p && p.catch) p.catch(function () {}); }
-  } catch (_) {}
+    if (!req) return Promise.resolve(false);
+    var p = req.call(el);
+    if (p && p.then) return p.then(function () { return true; }, function () { return false; });
+    // Old WebKit: no promise — infer engagement from the change event, or give up fast.
+    return new Promise(function (resolve) {
+      var timer = setTimeout(function () { cleanup(); resolve(false); }, 250);
+      function onChange() { cleanup(); resolve(true); }
+      function cleanup() {
+        clearTimeout(timer);
+        document.removeEventListener("fullscreenchange", onChange);
+        document.removeEventListener("webkitfullscreenchange", onChange);
+      }
+      document.addEventListener("fullscreenchange", onChange);
+      document.addEventListener("webkitfullscreenchange", onChange);
+    });
+  } catch (_) { return Promise.resolve(false); }
 }
 function exitFullscreen() {
   try {
@@ -1007,8 +1045,39 @@ function openBook() {
   // synthetic or direct call) may open the book before the loader finishes.
   if (document.body.classList.contains("boot-loading")) return;
   opened = true;
-  enterFullscreen();          // Play tap is a user gesture → allowed to go fullscreen
-  runOpenSequence();
+  // Everything the browser ties to the user gesture happens NOW, inside the tap:
+  // audio unlock + the muted play()/pause() that "activates" the page videos.
+  soundOn();
+  resumeAudio();
+  primeVideo(0); primeVideo(1);
+  // Entering fullscreen RESIZES the viewport, and re-rastering the whole scene
+  // at the new size while the 3D cover animation and the page-1 video decoder
+  // spin up is what starves tablet GPUs into flashing an unrendered BLACK frame
+  // (the fullscreen morph drops the old surface; the new one misses its
+  // deadline). So: request fullscreen first (the Play tap is the gesture it
+  // needs), let the resize SETTLE and paint the title card at the new size,
+  // THEN run the open sequence. If fullscreen is refused or unavailable
+  // (e.g. iPhone Safari), the book opens immediately instead.
+  var started = false;
+  var settleTimer = null;
+  var capTimer = setTimeout(start, 900);   // hard cap — never leave the reader waiting
+  function start() {
+    if (started) return;
+    started = true;
+    clearTimeout(capTimer); clearTimeout(settleTimer);
+    window.removeEventListener("resize", onResize);
+    requestAnimationFrame(function () { runOpenSequence(); });
+  }
+  function onResize() {                    // wait for the LAST resize + a beat to paint
+    if (started) return;
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(start, 180);
+  }
+  window.addEventListener("resize", onResize);
+  enterFullscreen().then(function (engaged) {
+    if (!engaged) start();                 // no fullscreen morph coming → open now
+    else onResize();                       // morph done / in flight → settle, then open
+  });
 }
 
 /* ---- Reset the whole book to the START SCREEN: the CLOSED FRONT COVER + Play

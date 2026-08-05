@@ -182,6 +182,74 @@ test.describe("embedded LBD", () => {
     assertClean(errs);
   });
 
+  test("a start the click relay can't see (untrusted click) still goes fullscreen", async ({ page }) => {
+    // Assistive-touch layers, TalkBack and kiosk/managed-tablet shells dispatch
+    // clicks with isTrusted:false. The game's own handler accepts those and
+    // starts, but the bridge's click relay ignores them — the observer fallback
+    // (on the game's .play-exit state mutation) must still post lbd-start, or
+    // the game plays trapped inside the page frame (real tablet bug).
+    const errs = watchErrors(page);
+    await gotoReady(page);
+    await waitForWarm(page);
+    await openBook(page);
+    await goToLbdPage(page);
+
+    const f = gameFrame(page);
+    await expect(page.frameLocator("#lbdFrame").locator("#playButton.play-ready")).toBeVisible({ timeout: 6000 });
+    await f.evaluate(() => document.getElementById("playButton").click());   // isTrusted: false
+
+    // The game really starts (intro flow advances, theme music up)…
+    await f.waitForFunction(() => window.state && window.state.step >= 1, null, { timeout: 20000 });
+    // …and the parent still gets the start handshake and goes fullscreen.
+    await expect(page.locator("body")).toHaveClass(/lbd-is-fullscreen/, { timeout: 4000 });
+    assertClean(errs);
+  });
+
+  test("opened from disk (file://): the start tap still expands to fullscreen", async ({ page }) => {
+    // Chromium treats every file: document as an OPAQUE origin while reporting
+    // location.origin as the literal string "file://". A postMessage targeted at
+    // that string can never match the parent's (opaque) origin and is dropped
+    // SILENTLY — and the parent's same-origin watchdog is blocked outright, so
+    // there is no second chance. The bridge must therefore fall back to "*" on
+    // any non-http(s) origin, or the whole game plays trapped inside the page
+    // frame (the real "double-clicked index.html" bug). This walk is the full
+    // reader journey over file:// — no server involved.
+    const bookUrl = new URL("../../index.html", import.meta.url); // dev/tests → book root
+    await page.goto(bookUrl.href);
+    await page.waitForSelector("body.boot-ready", { timeout: 45000 });
+    await openBook(page);
+
+    // Walk the three gated video pages exactly like a reader would.
+    for (let i = 0; i < 3; i++) {
+      const { finishCurrentVideo } = await import("./helpers.mjs");
+      await finishCurrentVideo(page);
+      await expect(page.locator("#cornerNext")).toBeEnabled({ timeout: 10000 });
+      await nextPage(page);
+    }
+    expect(await flippedCount(page)).toBe(3);
+    await expect(page.locator("#lbdStage")).toHaveClass(/visible/, { timeout: 10000 });
+
+    // Sanity-check the premise: the parent really CANNOT reach into the frame
+    // on file:// (if this ever becomes readable, the watchdog covers the bug
+    // and this test is only belt-and-suspenders).
+    const opaque = await page.evaluate(() => {
+      try { void document.getElementById("lbdFrame").contentWindow.document; return false; }
+      catch (e) { return true; }
+    });
+    expect(opaque, "file:// frames should be opaque origins").toBe(true);
+
+    // The REAL Let's Go tap → lbd-start must still arrive → fullscreen morph.
+    const letsGo = page.frameLocator("#lbdFrame").locator("#playButton.play-ready");
+    await expect(letsGo).toBeVisible({ timeout: 6000 });
+    await letsGo.click({ force: true });
+    await expect(page.locator("body")).toHaveClass(/lbd-is-fullscreen/, { timeout: 4000 });
+    await page.waitForTimeout(650); // page-frame → fullscreen morph settles
+    const stageBox = await page.locator("#lbdStage").boundingBox();
+    const vp = page.viewportSize();
+    expect(Math.round(stageBox.width)).toBe(vp.width);
+    expect(Math.round(stageBox.height)).toBe(vp.height);
+  });
+
   test("the game page cannot be skipped; leaving backwards clears the overlay", async ({ page }) => {
     const errs = watchErrors(page);
     await gotoReady(page);

@@ -16,11 +16,16 @@
     return;
   }
 
-  /* Same-site embed: talk to the real origin, never "*", except on file://
-     where the origin serialises to "null" and "*" is the only working target. */
+  /* Same-site embed: talk to the real origin, never "*" — but ONLY when that
+     origin is a real, serialisable http(s) one. Anywhere else "*" is the only
+     working target: on file:// Chromium reports location.origin as the literal
+     string "file://" while treating every file: frame as an OPAQUE origin, so a
+     postMessage targeted at "file://" can never match the parent and is dropped
+     silently — the flipbook then never receives lbd-start and the game plays
+     trapped inside the page frame instead of going fullscreen. */
   var TARGET_ORIGIN = "*";
   try {
-    if (window.location.origin && window.location.origin !== "null") {
+    if (/^https?:\/\//.test(window.location.origin || "")) {
       TARGET_ORIGIN = window.location.origin;
     }
   } catch (e) { /* keep "*" */ }
@@ -39,6 +44,11 @@
        • never while the button is un-armed (.play-ready missing = disabled),
        • never once the game is already running (start-mode gone / state locked). */
   var sentStart = false;
+  function sendStart() {
+    if (sentStart) { return; }
+    sentStart = true;
+    post({ source: "lbd", type: "lbd-start" });
+  }
   if (startButton) {
     startButton.addEventListener("click", function (e) {
       if (sentStart) { return; }
@@ -46,9 +56,31 @@
       if (!playStage || !playStage.classList.contains("start-mode")) { return; }
       if (!startButton.classList.contains("play-ready")) { return; }
       if (window.state && window.state.locked) { return; }
-      sentStart = true;
-      post({ source: "lbd", type: "lbd-start" });
+      sendStart();
     }, true);
+  }
+  /* Truth-path fallback: the click relay above only sees a TRUSTED click that
+     wins the listener-order race — it goes silent for starts driven by
+     assistive/kiosk layers (untrusted clicks), keyboard activation, or engines
+     that run target listeners in registration order. But every start path goes
+     through the game's own handler, which adds .play-exit to #playStage — its
+     single authoritative "the game really started" mutation. Relay THAT.
+     attributeOldValue matters: the intro's first scene switch strips the class
+     again (sometimes within the same tick), so the removal record's oldValue is
+     the only remaining evidence by the time the observer's microtask runs. */
+  if (playStage && window.MutationObserver) {
+    var startMo = new MutationObserver(function (records) {
+      var started = playStage.classList.contains("play-exit");
+      for (var i = 0; !started && i < records.length; i++) {
+        var old = records[i].oldValue;
+        if (old && old.indexOf("play-exit") !== -1) { started = true; }
+      }
+      if (started) {
+        startMo.disconnect();
+        sendStart();
+      }
+    });
+    startMo.observe(playStage, { attributes: true, attributeFilter: ["class"], attributeOldValue: true });
   }
 
   /* ── READY handshake (optional, best-effort) ──────────────────────────────
