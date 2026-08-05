@@ -1002,6 +1002,28 @@ function exitFullscreen() {
   } catch (_) {}
 }
 
+/* ---- Play-tap transition curtain (QA: tablet "pitch-black flash") --------
+   Raised synchronously inside the Play gesture, in the SAME frame as the
+   fullscreen request: the browser's fullscreen morph, the viewport resize and
+   the first re-raster at the new size all happen behind an opaque, theme-
+   matched backdrop instead of an unrendered black frame. Dropped (450ms
+   dissolve) one painted frame after the open sequence starts, so the curtain
+   melts into the cover-opening animation. A hard failsafe guarantees the
+   curtain can NEVER stay stuck over the book. */
+const openCurtain = document.getElementById("openCurtain");
+let curtainFailsafe = null;
+function showOpenCurtain() {
+  if (!openCurtain) return;
+  openCurtain.classList.add("on");
+  clearTimeout(curtainFailsafe);
+  curtainFailsafe = setTimeout(hideOpenCurtain, 2600);  // belt-and-suspenders
+}
+function hideOpenCurtain() {
+  if (!openCurtain) return;
+  clearTimeout(curtainFailsafe); curtainFailsafe = null;
+  openCurtain.classList.remove("on");
+}
+
 /* ---- Open the 3D cover, then hand off to the page-turning book ----------
    Shared by the first open (openBook) AND Replay (replayBook), so the dramatic
    hinge-open + post-open setup are identical both times. */
@@ -1058,6 +1080,11 @@ function openBook() {
   // needs), let the resize SETTLE and paint the title card at the new size,
   // THEN run the open sequence. If fullscreen is refused or unavailable
   // (e.g. iPhone Safari), the book opens immediately instead.
+  // Raise the transition curtain in the SAME synchronous gesture as the
+  // fullscreen request below: whatever the tablet does during the morph
+  // (resize, surface swap, re-raster) plays out behind an intentional
+  // cross-dissolve instead of a black cut.
+  showOpenCurtain();
   var started = false;
   var settleTimer = null;
   var capTimer = setTimeout(start, 900);   // hard cap — never leave the reader waiting
@@ -1066,7 +1093,12 @@ function openBook() {
     started = true;
     clearTimeout(capTimer); clearTimeout(settleTimer);
     window.removeEventListener("resize", onResize);
-    requestAnimationFrame(function () { runOpenSequence(); });
+    requestAnimationFrame(function () {
+      runOpenSequence();
+      // One more frame so the scene has actually PAINTED at the new viewport
+      // size, then dissolve the curtain into the opening cover.
+      requestAnimationFrame(function () { requestAnimationFrame(hideOpenCurtain); });
+    });
   }
   function onResize() {                    // wait for the LAST resize + a beat to paint
     if (started) return;
@@ -1084,6 +1116,7 @@ function openBook() {
    button, exactly like a fresh load (so tapping Play reads from the top). Shared
    by Replay and Home (called once the closing swing has finished). --------- */
 function resetToStart() {
+  hideOpenCurtain();          // defensive: never carry a stuck curtain to the cover
   exitFullscreen();           // back at the cover → leave fullscreen
   ready = false; opened = false; flipped = 0;
   // LBD teardown: whatever state the game page was in (visible, warming, or a

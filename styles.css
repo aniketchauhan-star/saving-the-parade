@@ -106,6 +106,30 @@
      pure black, which showed as a ~1s "pitch-black flash" on tablets. Theme it. */
   ::backdrop { background: #090626; }
 
+  /* Play-tap transition curtain (see index.html #openCurtain): the fullscreen
+     morph + first re-raster hide behind this opaque night layer, turning the
+     tablet "unrendered black flash" into a deliberate cross-dissolve.
+     Kept CHEAP on purpose — two soft glows + one linear gradient (a slimmed-down
+     copy of the body nightscape) so tablets can still hit frame deadlines while
+     the viewport is resizing. Fade IN is fast (the tap → dark ramp must beat the
+     morph); fade OUT is a slower dissolve into the cover-opening animation.
+     z-index: above the book (≤6), controls (700/720) and the LBD fullscreen
+     stage (1200); below the rotate notice (100000). */
+  .open-curtain {
+    position: fixed; inset: 0; z-index: 5000;
+    background:
+      radial-gradient(circle at 84% 12%, rgba(47,230,214,0.20) 0, transparent 42%),
+      radial-gradient(circle at 50% 106%, rgba(138,92,255,0.24) 0, transparent 55%),
+      linear-gradient(165deg, #090626 0%, #130d3e 46%, #23134f 100%);
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity 450ms ease, visibility 0s linear 450ms;
+  }
+  .open-curtain.on {
+    opacity: 1; visibility: visible;
+    pointer-events: auto;              /* swallow stray double-taps mid-morph */
+    transition: opacity 120ms ease-out;
+  }
+
   body {
     min-height: 100svh;
     display: flex; align-items: center; justify-content: center;
