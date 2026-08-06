@@ -1012,26 +1012,27 @@ function exitFullscreen() {
   } catch (_) {}
 }
 
-/* ---- Play-tap transition curtain (QA: tablet "pitch-black flash") --------
-   Raised synchronously inside the Play gesture so the first repaint after the
-   tap is an intentional night-colour dissolve, not an unrendered frame. On
-   touch/tablet opens, browser fullscreen is skipped entirely (see
-   shouldEnterFullscreenOnOpen), because its entry surface can paint above this
-   document. A hard failsafe guarantees the curtain can NEVER stay stuck over
-   the book. */
-const openCurtain = document.getElementById("openCurtain");
-let curtainFailsafe = null;
-function showOpenCurtain() {
-  if (!openCurtain) return;
-  openCurtain.classList.add("on");
-  clearTimeout(curtainFailsafe);
-  curtainFailsafe = setTimeout(hideOpenCurtain, 2600);  // belt-and-suspenders
-}
-function hideOpenCurtain() {
-  if (!openCurtain) return;
-  clearTimeout(curtainFailsafe); curtainFailsafe = null;
-  openCurtain.classList.remove("on");
-}
+/* ---- QA: the tablet "pitch-black flash" on the Play tap ------------------
+   RESOLVED — and the fix was to DELETE the previous fix, not extend it.
+   Earlier builds raised an opaque full-viewport "transition curtain" (#0d0834)
+   inside the Play gesture, on the theory that it was masking an unpainted
+   frame. Measuring the tap's real pixels (dev/black-flash-probe.mjs — records
+   the transition under CPU throttling and reads each frame's luminance) showed
+   the opposite:
+     • curtain present, 6x CPU throttle → 560ms of a perfectly FLAT dark
+       viewport, then it dissolved back to the SAME title card, because the
+       cover hinge had barely begun. That flat layer WAS the reported black
+       screen; the slower the device, the longer it lasted.
+     • curtain removed, same throttle → ZERO dark frames. Title card → cover
+       hinge → story page, unbroken.
+   There is no unpainted frame underneath: the page-1 poster (assets/posters/
+   1.webp) is a Stage-A gated asset, so the first page is already painted behind
+   the closed cover before Play is even tappable. The cover's own 3D hinge IS
+   the transition — nothing may be laid over it.
+   DO NOT reintroduce a full-viewport overlay on the Play path; the @mobile test
+   "Play transition stays in-page…" in dev/tests/loading.spec.mjs fails if one
+   appears. If a future change seems to need one, measure the frames first: an
+   opaque layer can only ever ADD a blank beat, never remove one. */
 
 /* ---- Open the 3D cover, then hand off to the page-turning book ----------
    Shared by the first open (openBook) AND Replay (replayBook), so the dramatic
@@ -1076,38 +1077,37 @@ function openBook() {
   // synthetic or direct call) may open the book before the loader finishes.
   if (document.body.classList.contains("boot-loading")) return;
   opened = true;
+  // NOTE: do NOT drop tapCatcher's pointer-events here. Stray taps during the
+  // hinge are already inert — every open route (#hint, tapCatcher, keyboard)
+  // guards on `opened`, which is true from this line on. And tapCatcher losing
+  // pointer-events is the signal that the open SEQUENCE has finished (set in
+  // runOpenSequence's timer, and asserted by dev/tests/helpers.mjs openBook);
+  // moving it up here makes "book is ready" fire ~6s early.
   // Everything the browser ties to the user gesture happens NOW, inside the tap:
   // audio unlock + the muted play()/pause() that "activates" the page videos.
   soundOn();
   resumeAudio();
   primeVideo(0); primeVideo(1);
-  // Raise the transition curtain in the SAME synchronous gesture, so the very
-  // first repaint after the tap is covered rather than an unrendered frame.
-  showOpenCurtain();
-  const mayRequestFullscreen = shouldEnterFullscreenOnOpen();
-  // FULLSCREEN IS DELIBERATELY OFF THE CRITICAL PATH.
-  // Earlier builds tried to hide the tablet black flash by holding this curtain
-  // through the browser's fullscreen viewport morph. QA kept reproducing it
-  // because the offending frame is painted by the browser above our document.
-  // Fix: touch/tablet opens never request browser fullscreen here. Desktop can
-  // still request it as a background enhancement after the story is already
-  // animating, where a rejected/delayed fullscreen request cannot block paint.
-  requestAnimationFrame(function () {
-    requestAnimationFrame(function () {
-      runOpenSequence();
-      if (mayRequestFullscreen) enterFullscreen();  // fire-and-forget; never gates the open
-      // One more frame so the scene has actually PAINTED, then dissolve the
-      // curtain into the opening cover.
-      requestAnimationFrame(function () { requestAnimationFrame(hideOpenCurtain); });
-    });
-  });
+  // START THE HINGE IN THE SAME FRAME AS THE TAP. No curtain, no rAF delay —
+  // the cover's swing is the transition, so the very first repaint after the tap
+  // already shows the title card in motion. (See the QA note above: the old
+  // 2-frame wait existed only to let a full-viewport curtain paint first, and
+  // that curtain was itself the reported black screen.)
+  runOpenSequence();
+  // FULLSCREEN IS DELIBERATELY OFF THE CRITICAL PATH. Touch/tablet opens never
+  // request it — those browsers paint their own fullscreen-entry surface above
+  // this document, which no in-page layer can cover. Desktop/kiosk may still
+  // request it as a background enhancement, one frame later, once the story is
+  // already animating, so a rejected or slow request cannot block paint.
+  if (shouldEnterFullscreenOnOpen()) {
+    requestAnimationFrame(function () { enterFullscreen(); });  // fire-and-forget
+  }
 }
 
 /* ---- Reset the whole book to the START SCREEN: the CLOSED FRONT COVER + Play
    button, exactly like a fresh load (so tapping Play reads from the top). Shared
    by Replay and Home (called once the closing swing has finished). --------- */
 function resetToStart() {
-  hideOpenCurtain();          // defensive: never carry a stuck curtain to the cover
   exitFullscreen();           // back at the cover → leave fullscreen
   ready = false; opened = false; flipped = 0;
   // LBD teardown: whatever state the game page was in (visible, warming, or a

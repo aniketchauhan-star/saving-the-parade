@@ -105,32 +105,14 @@
      animating. Theme the browser backdrop so any exposed area matches the app. */
   ::backdrop { background: #090626; }
 
-  /* Play-tap transition curtain (see index.html #openCurtain): a cheap,
-     compositor-only night layer that turns the title card into a deliberate
-     cross-dissolve. Tablet Play taps no longer call browser fullscreen, because
-     the browser-owned fullscreen-entry surface can paint above the document.
-     Fade IN is instant; fade OUT is a dissolve into the cover-opening animation.
-     z-index: above the book (≤6), controls (700/720) and the LBD fullscreen
-     stage (1200); below the rotate notice (100000). */
-  .open-curtain {
-    position: fixed; inset: 0; z-index: 5000;
-    /* SOLID night colour on purpose — the compositor draws single-colour layers
-       as paint-free quads. A gradient here would need raster work during the
-       tap transition, exactly when slower tablets are busy unlocking audio and
-       priming video. Do not add gradients/images back to this layer. */
-    background: #0d0834;
-    opacity: 0; pointer-events: none;
-    /* Pre-promoted to its own compositor layer at load: flipping .on is then a
-       compositor-only opacity change that cannot be blocked by main-thread or
-       raster work during the morph. (No visibility toggle for the same reason.) */
-    will-change: opacity;
-    transition: opacity 450ms ease;
-  }
-  .open-curtain.on {
-    opacity: 1;
-    pointer-events: auto;              /* swallow stray double-taps mid-morph */
-    transition: none;                  /* instant: must be fully opaque BEFORE the morph */
-  }
+  /* NO Play-tap transition curtain. A `.open-curtain` full-viewport layer used
+     to sit here to "cross-dissolve" the title card into the cover-opening
+     animation. Frame capture under CPU throttling showed it produced 560ms of a
+     flat near-black viewport and then faded back to the same title card — it
+     was the black flash, not the cure. The two rules above (the night-coloured
+     html background and ::backdrop) are the only safety nets needed; the cover's
+     3D hinge carries the transition. Do not add an opaque layer over the
+     opening book. */
 
   body {
     min-height: 100svh;
