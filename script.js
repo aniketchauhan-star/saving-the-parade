@@ -1106,9 +1106,19 @@ function openBook() {
     settleTimer = setTimeout(start, 180);
   }
   window.addEventListener("resize", onResize);
-  enterFullscreen().then(function (engaged) {
-    if (!engaged) start();                 // no fullscreen morph coming → open now
-    else onResize();                       // morph done / in flight → settle, then open
+  // TWO rAFs before requesting fullscreen: the fully-opaque curtain frame must
+  // actually be ON GLASS before the browser starts the fullscreen surface swap,
+  // or the swap can catch the tree mid-raster and present unrendered black (the
+  // QA tablet flash). Transient user activation comfortably survives the ~32ms,
+  // and if a stricter engine rejects the deferred request anyway, enterFullscreen
+  // resolves false and the book simply opens without fullscreen.
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      enterFullscreen().then(function (engaged) {
+        if (!engaged) start();             // no fullscreen morph coming → open now
+        else onResize();                   // morph done / in flight → settle, then open
+      });
+    });
   });
 }
 
