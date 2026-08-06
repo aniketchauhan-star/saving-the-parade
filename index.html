@@ -21,8 +21,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
-<!-- Night-theme browser chrome: on Android the UI bars adopt this colour during
-     the fullscreen enter/exit morph (Play tap), instead of flashing black. -->
+<!-- Night-theme browser chrome: on mobile/tablet the UI bars adopt this colour
+     during app chrome changes instead of flashing black. -->
 <meta name="theme-color" content="#090626" />
 <title>Saving the Parade</title>
 
@@ -216,13 +216,12 @@
   </button>
 </div>
 
-<!-- Play-tap transition CURTAIN: an opaque night-sky layer raised in the same
-     user gesture as the fullscreen request. The browser's fullscreen morph and
-     the first re-raster at the new viewport size (the QA "pitch-black flash" on
-     tablets) happen entirely behind this intentionally-styled backdrop, which
-     then dissolves into the cover-opening animation. Driven by script.js
-     (showOpenCurtain / hideOpenCurtain); sits above all book & game chrome,
-     below the rotate-to-landscape notice. -->
+<!-- Play-tap transition CURTAIN: an opaque night-sky layer raised immediately
+     on Play so the title card dissolves into the cover-opening animation with
+     no unpainted frame. Browser fullscreen is intentionally skipped on tablet
+     Play taps in script.js; this stays an in-page visual transition. Driven by
+     script.js (showOpenCurtain / hideOpenCurtain); sits above all book & game
+     chrome, below the rotate-to-landscape notice. -->
 <div class="open-curtain" id="openCurtain" aria-hidden="true"></div>
 
 <!-- Inlined one-shot SFX (base64) for glitch-free Web Audio playback on file:// -->

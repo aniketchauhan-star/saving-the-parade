@@ -88,9 +88,9 @@ async function probe(page, sels) {
 /* Resize, let the book re-fit, and PARK THE MOUSE far from every control —
    :hover applies scale(1.12), which would inflate the measured boxes. */
 async function settle(page, w, h) {
-  // The Play tap takes the BROWSER into real fullscreen (kiosk feel, script.js
-  // enterFullscreen), and a fullscreen window cannot be resized. That API is
-  // orthogonal to the CSS layout under test, so step out of it first.
+  // Desktop Play taps may take the browser into real fullscreen, and a
+  // fullscreen window cannot be resized. That API is orthogonal to the CSS
+  // layout under test, so step out of it first when present.
   await page.evaluate(async () => {
     if (document.fullscreenElement) {
       try { await document.exitFullscreen(); } catch (_) {}

@@ -965,10 +965,20 @@ function updateNavState() {
   }
 }
 
-/* ---- Fullscreen: go FULLSCREEN when the book opens (the Play tap is the user
-   gesture the Fullscreen API requires) and LEAVE fullscreen when back at the
-   cover (Home / Replay). Applies on every screen; silently no-ops where the
-   browser blocks it (e.g. iPhone Safari can't fullscreen arbitrary elements). */
+/* ---- Optional browser fullscreen ----------------------------------------
+   Browser fullscreen is useful on desktop/kiosk displays, but touch/tablet
+   browsers often paint their own fullscreen-entry surface above the page. That
+   OS/browser-owned layer is the persistent "black flash" QA kept catching after
+   the title-card Play tap, and no in-document curtain can cover it. So the
+   story opening stays entirely in-page on touch devices; the embedded LBD game
+   still uses its CSS fullscreen overlay later via setLbdFullscreen(). */
+function isTouchDevice() {
+  return (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) ||
+    (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+}
+function shouldEnterFullscreenOnOpen() {
+  return !isTouchDevice();
+}
 function enterFullscreen() {
   // Resolves TRUE only when a fullscreen morph actually started (the viewport
   // is about to resize); FALSE when fullscreen is unavailable, already active,
@@ -1003,13 +1013,12 @@ function exitFullscreen() {
 }
 
 /* ---- Play-tap transition curtain (QA: tablet "pitch-black flash") --------
-   Raised synchronously inside the Play gesture, in the SAME frame as the
-   fullscreen request: the browser's fullscreen morph, the viewport resize and
-   the first re-raster at the new size all happen behind an opaque, theme-
-   matched backdrop instead of an unrendered black frame. Dropped (450ms
-   dissolve) one painted frame after the open sequence starts, so the curtain
-   melts into the cover-opening animation. A hard failsafe guarantees the
-   curtain can NEVER stay stuck over the book. */
+   Raised synchronously inside the Play gesture so the first repaint after the
+   tap is an intentional night-colour dissolve, not an unrendered frame. On
+   touch/tablet opens, browser fullscreen is skipped entirely (see
+   shouldEnterFullscreenOnOpen), because its entry surface can paint above this
+   document. A hard failsafe guarantees the curtain can NEVER stay stuck over
+   the book. */
 const openCurtain = document.getElementById("openCurtain");
 let curtainFailsafe = null;
 function showOpenCurtain() {
@@ -1075,28 +1084,18 @@ function openBook() {
   // Raise the transition curtain in the SAME synchronous gesture, so the very
   // first repaint after the tap is covered rather than an unrendered frame.
   showOpenCurtain();
+  const mayRequestFullscreen = shouldEnterFullscreenOnOpen();
   // FULLSCREEN IS DELIBERATELY OFF THE CRITICAL PATH.
-  // Earlier builds held this curtain for up to ~1.2s, waiting for the tablet's
-  // fullscreen viewport morph to "settle" before starting the cover-opening
-  // animation — on the theory that starting too early would race the resize.
-  // QA kept reproducing the same ~1s black flash regardless (2026-07-30 through
-  // 2026-08-06, five retests): most of that black frame is the BROWSER'S OWN
-  // system-level fullscreen-entry transition — the black backdrop + "drag from
-  // the top to exit fullscreen" hint Android/Chrome paints OUTSIDE our document
-  // while it hides its UI chrome. No in-page curtain can cover something the
-  // browser draws above our page, so holding the curtain longer only delayed
-  // the reveal without ever hiding that flash.
-  // Fix: start the story IMMEDIATELY, at whatever viewport size we already
-  // have, and request fullscreen in parallel as a background enhancement that
-  // never gates the open. If the browser's own transition fires, it now lands
-  // over content that's already playing instead of over a blank tap. Any
-  // resize this triggers is cheap (fitScale() only rescales a CSS transform via
-  // onViewportChange) and never interrupts the 6s cover-hinge animation — that
-  // handler freezes only the page-leaf transitions, not .cover's own animation.
+  // Earlier builds tried to hide the tablet black flash by holding this curtain
+  // through the browser's fullscreen viewport morph. QA kept reproducing it
+  // because the offending frame is painted by the browser above our document.
+  // Fix: touch/tablet opens never request browser fullscreen here. Desktop can
+  // still request it as a background enhancement after the story is already
+  // animating, where a rejected/delayed fullscreen request cannot block paint.
   requestAnimationFrame(function () {
     requestAnimationFrame(function () {
       runOpenSequence();
-      enterFullscreen();               // fire-and-forget; never gates the open
+      if (mayRequestFullscreen) enterFullscreen();  // fire-and-forget; never gates the open
       // One more frame so the scene has actually PAINTED, then dissolve the
       // curtain into the opening cover.
       requestAnimationFrame(function () { requestAnimationFrame(hideOpenCurtain); });

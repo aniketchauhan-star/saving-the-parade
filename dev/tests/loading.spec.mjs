@@ -102,4 +102,49 @@ test.describe("Stage A loading", () => {
     await page.keyboard.press("Enter");
     await expect(page.locator("body.is-open")).toHaveCount(1, { timeout: 5000 });
   });
+
+  test("Play transition stays in-page on touch devices, with no browser fullscreen flash @mobile", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "mobile-landscape", "touch-only regression");
+    const errs = watchErrors(page);
+    await gotoReady(page);
+
+    const fullscreenEvents = [];
+    await page.exposeFunction("__recordFullscreenEvent", (isFullscreen) => {
+      fullscreenEvents.push(isFullscreen);
+    });
+    await page.evaluate(() => {
+      document.addEventListener("fullscreenchange", () => {
+        window.__recordFullscreenEvent(Boolean(document.fullscreenElement));
+      });
+      document.addEventListener("webkitfullscreenchange", () => {
+        window.__recordFullscreenEvent(Boolean(document.webkitFullscreenElement));
+      });
+    });
+
+    await page.click("#hint", { force: true });
+    await page.waitForSelector("body.is-open", { timeout: 5000 });
+    await page.waitForTimeout(1400); // past the old delayed fullscreen-entry window
+
+    const state = await page.evaluate(() => {
+      const curtain = document.getElementById("openCurtain");
+      const flipbook = document.getElementById("flipbook");
+      return {
+        fullscreen: Boolean(document.fullscreenElement || document.webkitFullscreenElement),
+        curtainOn: curtain.classList.contains("on"),
+        curtainOpacity: Number(getComputedStyle(curtain).opacity),
+        flipbookShown: flipbook.classList.contains("show"),
+        firstVideoReady: Boolean(document.querySelector(".leaf video.page-media")),
+        touchPoints: navigator.maxTouchPoints || 0,
+      };
+    });
+
+    expect(state.touchPoints).toBeGreaterThan(0);
+    expect(state.fullscreen).toBe(false);
+    expect(fullscreenEvents).toEqual([]);
+    expect(state.curtainOn).toBe(false);
+    expect(state.curtainOpacity).toBeLessThan(0.05);
+    expect(state.flipbookShown).toBe(true);
+    expect(state.firstVideoReady).toBe(true);
+    assertClean(errs);
+  });
 });
