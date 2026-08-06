@@ -117,17 +117,24 @@
      stage (1200); below the rotate notice (100000). */
   .open-curtain {
     position: fixed; inset: 0; z-index: 5000;
-    background:
-      radial-gradient(circle at 84% 12%, rgba(47,230,214,0.20) 0, transparent 42%),
-      radial-gradient(circle at 50% 106%, rgba(138,92,255,0.24) 0, transparent 55%),
-      linear-gradient(165deg, #090626 0%, #130d3e 46%, #23134f 100%);
-    opacity: 0; visibility: hidden; pointer-events: none;
-    transition: opacity 450ms ease, visibility 0s linear 450ms;
+    /* SOLID night colour on purpose — the compositor draws single-colour layers
+       as paint-free quads, so this stays on glass through the whole fullscreen
+       morph even when every raster deadline is missed. A gradient here must
+       re-rasterise at the new viewport size mid-morph, which is exactly when
+       the tablet GPU is starved — that re-raster miss IS the black flash.
+       Do not add gradients/images back to this layer. */
+    background: #0d0834;
+    opacity: 0; pointer-events: none;
+    /* Pre-promoted to its own compositor layer at load: flipping .on is then a
+       compositor-only opacity change that cannot be blocked by main-thread or
+       raster work during the morph. (No visibility toggle for the same reason.) */
+    will-change: opacity;
+    transition: opacity 450ms ease;
   }
   .open-curtain.on {
-    opacity: 1; visibility: visible;
+    opacity: 1;
     pointer-events: auto;              /* swallow stray double-taps mid-morph */
-    transition: opacity 120ms ease-out;
+    transition: none;                  /* instant: must be fully opaque BEFORE the morph */
   }
 
   body {
