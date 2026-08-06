@@ -1087,9 +1087,31 @@ function openBook() {
   showOpenCurtain();
   var started = false;
   var settleTimer = null;
-  var capTimer = setTimeout(start, 900);   // hard cap — never leave the reader waiting
+  // Floor timestamp (performance.now()) before which start() refuses to run,
+  // set only once fullscreen actually engages (see below) — see start()'s own
+  // guard for WHY this exists; it is the actual fix for the tablet flash.
+  var minStartAt = 0;
+  var capTimer = setTimeout(start, 1250);   // hard cap — never leave the reader waiting
   function start() {
     if (started) return;
+    // The fullscreen PROMISE resolving (or a resize event firing) tells us the
+    // morph has STARTED — it does NOT tell us the tablet's OS-level chrome-hide
+    // + surface-resize animation has finished PAINTING. On slower tablet GPUs
+    // that animation keeps running for several hundred ms after the promise
+    // settles and after the first 'resize' event fires, which is exactly the
+    // gap the original 180ms-after-resize heuristic missed (QA's ~1s flash
+    // happened AFTER the curtain had already been dismissed). So: once
+    // minStartAt is armed, start() cannot fire before it, however early every
+    // other signal (resize settle, even the cap) says "ready" — it just
+    // reschedules itself for the remaining time instead.
+    if (minStartAt) {
+      var remaining = minStartAt - performance.now();
+      if (remaining > 0) {
+        clearTimeout(settleTimer);
+        settleTimer = setTimeout(start, remaining);
+        return;
+      }
+    }
     started = true;
     clearTimeout(capTimer); clearTimeout(settleTimer);
     window.removeEventListener("resize", onResize);
@@ -1103,7 +1125,7 @@ function openBook() {
   function onResize() {                    // wait for the LAST resize + a beat to paint
     if (started) return;
     clearTimeout(settleTimer);
-    settleTimer = setTimeout(start, 180);
+    settleTimer = setTimeout(start, 450);
   }
   window.addEventListener("resize", onResize);
   // TWO rAFs before requesting fullscreen: the fully-opaque curtain frame must
@@ -1115,8 +1137,13 @@ function openBook() {
   requestAnimationFrame(function () {
     requestAnimationFrame(function () {
       enterFullscreen().then(function (engaged) {
-        if (!engaged) start();             // no fullscreen morph coming → open now
-        else onResize();                   // morph done / in flight → settle, then open
+        if (!engaged) { start(); return; }   // no fullscreen morph coming → open now
+        // Morph engaged: arm the floor (see start()) THEN run the normal
+        // resize-settle debounce on top of it — a genuine late resize can still
+        // push the open out further than the floor, it just can no longer pull
+        // it earlier.
+        minStartAt = performance.now() + 700;
+        onResize();
       });
     });
   });
