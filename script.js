@@ -1072,79 +1072,34 @@ function openBook() {
   soundOn();
   resumeAudio();
   primeVideo(0); primeVideo(1);
-  // Entering fullscreen RESIZES the viewport, and re-rastering the whole scene
-  // at the new size while the 3D cover animation and the page-1 video decoder
-  // spin up is what starves tablet GPUs into flashing an unrendered BLACK frame
-  // (the fullscreen morph drops the old surface; the new one misses its
-  // deadline). So: request fullscreen first (the Play tap is the gesture it
-  // needs), let the resize SETTLE and paint the title card at the new size,
-  // THEN run the open sequence. If fullscreen is refused or unavailable
-  // (e.g. iPhone Safari), the book opens immediately instead.
-  // Raise the transition curtain in the SAME synchronous gesture as the
-  // fullscreen request below: whatever the tablet does during the morph
-  // (resize, surface swap, re-raster) plays out behind an intentional
-  // cross-dissolve instead of a black cut.
+  // Raise the transition curtain in the SAME synchronous gesture, so the very
+  // first repaint after the tap is covered rather than an unrendered frame.
   showOpenCurtain();
-  var started = false;
-  var settleTimer = null;
-  // Floor timestamp (performance.now()) before which start() refuses to run,
-  // set only once fullscreen actually engages (see below) — see start()'s own
-  // guard for WHY this exists; it is the actual fix for the tablet flash.
-  var minStartAt = 0;
-  var capTimer = setTimeout(start, 1250);   // hard cap — never leave the reader waiting
-  function start() {
-    if (started) return;
-    // The fullscreen PROMISE resolving (or a resize event firing) tells us the
-    // morph has STARTED — it does NOT tell us the tablet's OS-level chrome-hide
-    // + surface-resize animation has finished PAINTING. On slower tablet GPUs
-    // that animation keeps running for several hundred ms after the promise
-    // settles and after the first 'resize' event fires, which is exactly the
-    // gap the original 180ms-after-resize heuristic missed (QA's ~1s flash
-    // happened AFTER the curtain had already been dismissed). So: once
-    // minStartAt is armed, start() cannot fire before it, however early every
-    // other signal (resize settle, even the cap) says "ready" — it just
-    // reschedules itself for the remaining time instead.
-    if (minStartAt) {
-      var remaining = minStartAt - performance.now();
-      if (remaining > 0) {
-        clearTimeout(settleTimer);
-        settleTimer = setTimeout(start, remaining);
-        return;
-      }
-    }
-    started = true;
-    clearTimeout(capTimer); clearTimeout(settleTimer);
-    window.removeEventListener("resize", onResize);
-    requestAnimationFrame(function () {
-      runOpenSequence();
-      // One more frame so the scene has actually PAINTED at the new viewport
-      // size, then dissolve the curtain into the opening cover.
-      requestAnimationFrame(function () { requestAnimationFrame(hideOpenCurtain); });
-    });
-  }
-  function onResize() {                    // wait for the LAST resize + a beat to paint
-    if (started) return;
-    clearTimeout(settleTimer);
-    settleTimer = setTimeout(start, 450);
-  }
-  window.addEventListener("resize", onResize);
-  // TWO rAFs before requesting fullscreen: the fully-opaque curtain frame must
-  // actually be ON GLASS before the browser starts the fullscreen surface swap,
-  // or the swap can catch the tree mid-raster and present unrendered black (the
-  // QA tablet flash). Transient user activation comfortably survives the ~32ms,
-  // and if a stricter engine rejects the deferred request anyway, enterFullscreen
-  // resolves false and the book simply opens without fullscreen.
+  // FULLSCREEN IS DELIBERATELY OFF THE CRITICAL PATH.
+  // Earlier builds held this curtain for up to ~1.2s, waiting for the tablet's
+  // fullscreen viewport morph to "settle" before starting the cover-opening
+  // animation — on the theory that starting too early would race the resize.
+  // QA kept reproducing the same ~1s black flash regardless (2026-07-30 through
+  // 2026-08-06, five retests): most of that black frame is the BROWSER'S OWN
+  // system-level fullscreen-entry transition — the black backdrop + "drag from
+  // the top to exit fullscreen" hint Android/Chrome paints OUTSIDE our document
+  // while it hides its UI chrome. No in-page curtain can cover something the
+  // browser draws above our page, so holding the curtain longer only delayed
+  // the reveal without ever hiding that flash.
+  // Fix: start the story IMMEDIATELY, at whatever viewport size we already
+  // have, and request fullscreen in parallel as a background enhancement that
+  // never gates the open. If the browser's own transition fires, it now lands
+  // over content that's already playing instead of over a blank tap. Any
+  // resize this triggers is cheap (fitScale() only rescales a CSS transform via
+  // onViewportChange) and never interrupts the 6s cover-hinge animation — that
+  // handler freezes only the page-leaf transitions, not .cover's own animation.
   requestAnimationFrame(function () {
     requestAnimationFrame(function () {
-      enterFullscreen().then(function (engaged) {
-        if (!engaged) { start(); return; }   // no fullscreen morph coming → open now
-        // Morph engaged: arm the floor (see start()) THEN run the normal
-        // resize-settle debounce on top of it — a genuine late resize can still
-        // push the open out further than the floor, it just can no longer pull
-        // it earlier.
-        minStartAt = performance.now() + 700;
-        onResize();
-      });
+      runOpenSequence();
+      enterFullscreen();               // fire-and-forget; never gates the open
+      // One more frame so the scene has actually PAINTED, then dissolve the
+      // curtain into the opening cover.
+      requestAnimationFrame(function () { requestAnimationFrame(hideOpenCurtain); });
     });
   });
 }
