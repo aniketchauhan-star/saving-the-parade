@@ -97,32 +97,27 @@
   }
 
   /* Solid night base on the ROOT itself: any region the body gradient hasn't
-     painted yet (fullscreen enter/exit, orientation change, resize) shows this
+     painted yet (orientation change, resize, browser chrome changes) shows this
      instead of unrendered black. Must match the body gradient's darkest stop. */
   html { background-color: #090626; }
 
-  /* Entering fullscreen (Play tap → requestFullscreen) makes the browser paint
-     the ::backdrop behind the root while the viewport morphs — its DEFAULT is
-     pure black, which showed as a ~1s "pitch-black flash" on tablets. Theme it. */
+  /* Desktop/kiosk may still enter browser fullscreen after the story is already
+     animating. Theme the browser backdrop so any exposed area matches the app. */
   ::backdrop { background: #090626; }
 
-  /* Play-tap transition curtain (see index.html #openCurtain): the fullscreen
-     morph + first re-raster hide behind this opaque night layer, turning the
-     tablet "unrendered black flash" into a deliberate cross-dissolve.
-     Kept CHEAP on purpose — two soft glows + one linear gradient (a slimmed-down
-     copy of the body nightscape) so tablets can still hit frame deadlines while
-     the viewport is resizing. Fade IN is fast (the tap → dark ramp must beat the
-     morph); fade OUT is a slower dissolve into the cover-opening animation.
+  /* Play-tap transition curtain (see index.html #openCurtain): a cheap,
+     compositor-only night layer that turns the title card into a deliberate
+     cross-dissolve. Tablet Play taps no longer call browser fullscreen, because
+     the browser-owned fullscreen-entry surface can paint above the document.
+     Fade IN is instant; fade OUT is a dissolve into the cover-opening animation.
      z-index: above the book (≤6), controls (700/720) and the LBD fullscreen
      stage (1200); below the rotate notice (100000). */
   .open-curtain {
     position: fixed; inset: 0; z-index: 5000;
     /* SOLID night colour on purpose — the compositor draws single-colour layers
-       as paint-free quads, so this stays on glass through the whole fullscreen
-       morph even when every raster deadline is missed. A gradient here must
-       re-rasterise at the new viewport size mid-morph, which is exactly when
-       the tablet GPU is starved — that re-raster miss IS the black flash.
-       Do not add gradients/images back to this layer. */
+       as paint-free quads. A gradient here would need raster work during the
+       tap transition, exactly when slower tablets are busy unlocking audio and
+       priming video. Do not add gradients/images back to this layer. */
     background: #0d0834;
     opacity: 0; pointer-events: none;
     /* Pre-promoted to its own compositor layer at load: flipping .on is then a
@@ -157,9 +152,8 @@
       linear-gradient(165deg, #090626 0%, #130d3e 46%, #23134f 100%);
     /* NO background-attachment:fixed — the page never scrolls (overflow:hidden),
        so `fixed` was visually identical but forced this whole multi-layer
-       gradient down the slow repaint path on tablets: every viewport change
-       (the fullscreen morph after Play, rotation) re-rasterised it, adding to
-       the black-flash / lag on tap. */
+       gradient down the slow repaint path on tablets during viewport changes
+       such as rotation and browser chrome movement. */
   }
 
   /* Whole scene fades + scales in on load (entrance animation) */
