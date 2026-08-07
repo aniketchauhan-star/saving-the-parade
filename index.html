@@ -216,13 +216,12 @@
   </button>
 </div>
 
-<!-- Play-tap transition CURTAIN: an opaque night-sky layer raised immediately
-     on Play so the title card dissolves into the cover-opening animation with
-     no unpainted frame. Browser fullscreen is intentionally skipped on tablet
-     Play taps in script.js; this stays an in-page visual transition. Driven by
-     script.js (showOpenCurtain / hideOpenCurtain); sits above all book & game
-     chrome, below the rotate-to-landscape notice. -->
-<div class="open-curtain" id="openCurtain" aria-hidden="true"></div>
+<!-- NOTE: there is deliberately NO transition overlay on the Play tap.
+     A full-viewport "curtain" used to live here to mask a supposed unpainted
+     frame; frame capture proved it WAS the black flash QA kept reporting (it
+     blanketed the screen, then dissolved back to the same title card). The
+     cover's 3D hinge is the transition. See the QA note in script.js above
+     runOpenSequence before adding any layer over the opening book. -->
 
 <!-- Inlined one-shot SFX (base64) for glitch-free Web Audio playback on file:// -->
 <script src="sfx-data.js"></script>
