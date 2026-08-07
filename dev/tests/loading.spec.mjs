@@ -121,17 +121,56 @@ test.describe("Stage A loading", () => {
       });
     });
 
+    // Watch EVERY frame of the transition for an opaque layer blanketing the
+    // viewport. This is the actual QA defect: the old #openCurtain covered the
+    // whole screen in flat #0d0834 for ~0.5s (longer the slower the tablet) and
+    // then dissolved back to the same title card.
+    //
+    // Two traps this detector deliberately avoids — the previous version of this
+    // test fell into both and passed while the flash was still shipping:
+    //   1. It sampled the curtain's state ONCE, 1.4s after the tap. By then it
+    //      was already off. Bound the watch by WALL CLOCK, not frame count:
+    //      headless rAF is unthrottled, so a 90-frame window can close in ~100ms
+    //      — before the click even lands.
+    //   2. It trusted elementFromPoint, which skips pointer-events:none layers.
+    //      An opaque blanket that ignores pointer events is just as black. So
+    //      scan the tree by geometry + paint instead of by hit-testing.
+    await page.evaluate((ms) => {
+      window.__blankets = [];
+      const deadline = performance.now() + ms;
+      // A "blanket" = any rendered element spanning (nearly) the whole viewport
+      // that paints an opaque colour of its own. `.scene` / `.tap-catcher` span
+      // the viewport too, but they are transparent, so they never qualify.
+      const isBlanket = (el, cs) => {
+        if (Number(cs.opacity) < 0.5) return false;
+        if (cs.visibility === "hidden" || cs.display === "none") return false;
+        const m = cs.backgroundColor.match(/[\d.]+/g);
+        if (!m) return false;
+        return (m.length > 3 ? Number(m[3]) : 1) > 0.5;
+      };
+      (function tick() {
+        for (const el of document.body.querySelectorAll("*")) {
+          const r = el.getBoundingClientRect();
+          if (r.width < innerWidth * 0.95 || r.height < innerHeight * 0.95) continue;
+          const cs = getComputedStyle(el);
+          if (!isBlanket(el, cs)) continue;
+          window.__blankets.push(el.tagName + "." + (el.className || "-") + "#" + (el.id || "-"));
+        }
+        if (performance.now() < deadline) requestAnimationFrame(tick);
+      })();
+    }, 3000);
+
     await page.click("#hint", { force: true });
     await page.waitForSelector("body.is-open", { timeout: 5000 });
     await page.waitForTimeout(1400); // past the old delayed fullscreen-entry window
 
     const state = await page.evaluate(() => {
-      const curtain = document.getElementById("openCurtain");
       const flipbook = document.getElementById("flipbook");
       return {
         fullscreen: Boolean(document.fullscreenElement || document.webkitFullscreenElement),
-        curtainOn: curtain.classList.contains("on"),
-        curtainOpacity: Number(getComputedStyle(curtain).opacity),
+        // The curtain element is GONE for good — see the QA note in script.js.
+        curtainExists: Boolean(document.getElementById("openCurtain")),
+        blankets: [...new Set(window.__blankets)],
         flipbookShown: flipbook.classList.contains("show"),
         firstVideoReady: Boolean(document.querySelector(".leaf video.page-media")),
         touchPoints: navigator.maxTouchPoints || 0,
@@ -141,10 +180,37 @@ test.describe("Stage A loading", () => {
     expect(state.touchPoints).toBeGreaterThan(0);
     expect(state.fullscreen).toBe(false);
     expect(fullscreenEvents).toEqual([]);
-    expect(state.curtainOn).toBe(false);
-    expect(state.curtainOpacity).toBeLessThan(0.05);
+    expect(state.curtainExists).toBe(false);
+    // No frame of the title-card → book-open transition may be blanketed.
+    expect(state.blankets, "opaque full-viewport layer during the Play transition")
+      .toEqual([]);
     expect(state.flipbookShown).toBe(true);
     expect(state.firstVideoReady).toBe(true);
+    assertClean(errs);
+  });
+
+  test("the cover hinge starts in the SAME frame as the Play tap @mobile", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "mobile-landscape", "touch-only regression");
+    const errs = watchErrors(page);
+    await gotoReady(page);
+
+    // The open used to be deferred two rAFs so a curtain could paint first.
+    // Nothing is layered over the tap now, so the hinge must be running by the
+    // first frame after it — that immediacy IS the transition.
+    const framesUntilOpen = await page.evaluate(async () => {
+      let frames = 0;
+      const done = new Promise((resolve) => {
+        const step = () => {
+          if (document.body.classList.contains("is-open")) return resolve(frames);
+          if (++frames > 30) return resolve(frames);
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      });
+      document.getElementById("hint").click();
+      return done;
+    });
+    expect(framesUntilOpen).toBeLessThanOrEqual(1);
     assertClean(errs);
   });
 });
