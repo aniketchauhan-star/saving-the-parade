@@ -63,12 +63,10 @@ const pages = [
   // after window load. Landing here reveals the already-booted intro INSIDE the
   // page frame; the game's own "Let's Go" tap expands it to fullscreen, and its
   // completion turns the book to the next page automatically.
-  // Poster = the game's EMBEDDED boot screen backdrop (LetsPlayBg.webp — the
-  // plain lab room), NOT GameStartScreen.webp: that art is a full "Save the
-  // Parade" title card, which mid-story read as the book's welcome screen
-  // re-appearing. The game (in embed mode) boots onto the same backdrop, so the
-  // leaf poster → live-iframe handoff stays seamless.
-  { type: "lbd", src: "game/index.html", poster: "game/assets/LetsPlayBg.webp" },
+  // Poster = the game's own start screen (GameStartScreen.webp), the exact art
+  // the live iframe boots onto — so the leaf poster → live-game handoff shows
+  // the same picture and never flashes a different backdrop.
+  { type: "lbd", src: "game/index.html", poster: "game/assets/GameStartScreen.webp" },
   { type: "video", src: "assets/4.webm" },  // 5
   { type: "end" },                          // 6 — THE END page (cream) + Replay
 ];
@@ -680,7 +678,8 @@ function primeVideo(i) {
 
 function refreshMedia() {
   const idx = flipped;                         // the front-most page right now
-  if (idx !== lastMediaIdx) {                  // ARRIVAL on a new page (once per visit)
+  const arrived = (idx !== lastMediaIdx);      // first call of THIS visit to this page?
+  if (arrived) {                               // ARRIVAL on a new page (once per visit)
     lastMediaIdx = idx;
     armBlink = true;                           // arm the video-end blink once per page
     armPageGate(idx);                          // re-arm / release the forward video gate
@@ -702,11 +701,19 @@ function refreshMedia() {
   const cur = leaves[idx];
   const v = cur && cur.querySelector("video.page-media");
   if (v) {
+    // EVERY ARRIVAL REPLAYS THE PAGE FROM FRAME 0. Leaving a page only PAUSES its
+    // video (so the sheet flips away showing the frame it stopped on), so without
+    // this a revisit would pick up at that paused timestamp — the reader would
+    // land mid-scene, mid-sentence. Only the FIRST call of a visit rewinds: a flip
+    // fires refreshMedia twice for the same page (turn start + settle), and the
+    // second one must never restart the clip that just began.
+    if (arrived) { try { v.pause(); v.currentTime = 0; } catch (_) {} }
     const delayMs = (pages[idx] && pages[idx].delay) ? pages[idx].delay : 0;
     if (delayMs > 0) {
       // Already playing this page, or already counting down for it → leave it alone
-      // (so the flip-start + flip-end calls don't restart the 3s countdown).
-      if (mediaDelayIdx === idx && (mediaDelayTimer || !v.paused)) { /* keep going */ }
+      // (so the flip-start + flip-end calls don't restart the 3s countdown). A fresh
+      // ARRIVAL always re-arms the countdown from frame 0, though.
+      if (!arrived && mediaDelayIdx === idx && (mediaDelayTimer || !v.paused)) { /* keep going */ }
       else {
         try { v.pause(); v.currentTime = 0; } catch (_) {}   // hold on the first frame
         mediaDelayIdx = idx;

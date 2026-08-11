@@ -82,6 +82,42 @@ test.describe("universal video gating", () => {
     await expect(page.locator("#cornerPrev")).toBeEnabled();
   });
 
+  test("a revisited page REPLAYS its video from the start, never from where it was paused", async ({ page }) => {
+    // Leaving a page only pauses its clip (the sheet flips away on that frame),
+    // so coming back must rewind it — otherwise the reader lands mid-scene.
+    const timeOf = (i) =>
+      page.evaluate((n) => {
+        const v = document.querySelectorAll(".leaf")[n].querySelector("video.page-media");
+        return { t: v.currentTime, paused: v.paused };
+      }, i);
+
+    await gotoReady(page);
+    await openBook(page);
+    await finishCurrentVideo(page);
+    await nextPage(page);                       // page 2, playing from 0
+
+    // Watch a slice of page 2, then leave it MID-CLIP (Back is never gated).
+    await page.waitForTimeout(4000);
+    const watched = await timeOf(1);
+    expect(watched.t, "page 2 should really be playing before we leave").toBeGreaterThan(3);
+
+    await page.click("#cornerPrev");
+    await page.waitForFunction(() => document.querySelectorAll(".leaf.flipped").length === 0);
+    await page.waitForTimeout(1400);
+
+    // Page 1 was watched to the end earlier — it too starts over, not on its last frame.
+    const back = await timeOf(0);
+    expect(back.paused, "the revisited page's video plays").toBe(false);
+    expect(back.t, "page 1 restarts from the beginning").toBeLessThan(2.5);
+
+    // Forward again → page 2 restarts, it does NOT resume at ~4s.
+    await nextPage(page);
+    const again = await timeOf(1);
+    expect(again.paused).toBe(false);
+    expect(again.t, "page 2 restarts instead of resuming").toBeLessThan(watched.t - 1);
+    expect(again.t).toBeLessThan(2.5);
+  });
+
   test("the revealed Next arrow glow-pulses once, then returns to normal", async ({ page }) => {
     await gotoReady(page);
     await openBook(page);
